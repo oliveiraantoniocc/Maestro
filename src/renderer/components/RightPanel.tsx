@@ -144,6 +144,10 @@ export function RightPanel(props: RightPanelProps) {
         ref={fileTreeContainerRef}
         className="flex-1 px-4 pb-4 overflow-y-auto min-w-[24rem] outline-none"
         tabIndex={-1}
+        onClick={() => {
+          setActiveFocus('right');
+          fileTreeContainerRef.current?.focus();
+        }}
         onScroll={(e) => {
           const scrollTop = e.currentTarget.scrollTop;
           setSessions(prev => prev.map(s =>

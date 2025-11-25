@@ -57,12 +57,12 @@ export function GitDiffViewer({ diffText, cwd, theme, onClose }: GitDiffViewerPr
   if (parsedFiles.length === 0) {
     return (
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm"
+        className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm"
         style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
         onClick={onClose}
       >
         <div
-          className="w-[90%] h-[90%] rounded-lg shadow-2xl flex flex-col overflow-hidden"
+          className="w-[85%] max-w-[1400px] h-[90%] rounded-lg shadow-2xl flex flex-col overflow-hidden"
           style={{ backgroundColor: theme.colors.bgMain, borderColor: theme.colors.border, border: '1px solid' }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -92,12 +92,12 @@ export function GitDiffViewer({ diffText, cwd, theme, onClose }: GitDiffViewerPr
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm"
       style={{ backgroundColor: 'rgba(0,0,0,0.8)' }}
       onClick={onClose}
     >
       <div
-        className="w-[90%] h-[90%] rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        className="w-[85%] max-w-[1400px] h-[90%] rounded-lg shadow-2xl flex flex-col overflow-hidden"
         style={{ backgroundColor: theme.colors.bgMain, borderColor: theme.colors.border, border: '1px solid' }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -343,6 +343,13 @@ export default function MaestroConsole() {
     }
   }, [logViewerOpen]);
 
+  // Close file preview when switching sessions
+  useEffect(() => {
+    if (previewFile !== null) {
+      setPreviewFile(null);
+    }
+  }, [activeSessionId]);
+
   // Restore a persisted session by respawning its process
   const restoreSession = async (session: Session): Promise<Session> => {
     try {
@@ -861,33 +868,27 @@ export default function MaestroConsole() {
         const totalSessions = sortedSessions.length;
         if (totalSessions === 0) return;
 
-        if (e.key === 'ArrowDown') {
-          setSelectedSidebarIndex(prev => {
-            const next = (prev + 1) % totalSessions;
-            // Auto-expand group if the selected session belongs to a collapsed group
-            const nextSession = sortedSessions[next];
-            if (nextSession?.groupId) {
-              const group = groups.find(g => g.id === nextSession.groupId);
-              if (group?.collapsed) {
-                toggleGroup(group.id);
-              }
-            }
-            return next;
-          });
-        } else {
-          setSelectedSidebarIndex(prev => {
-            const next = (prev - 1 + totalSessions) % totalSessions;
-            // Auto-expand group if the selected session belongs to a collapsed group
-            const nextSession = sortedSessions[next];
-            if (nextSession?.groupId) {
-              const group = groups.find(g => g.id === nextSession.groupId);
-              if (group?.collapsed) {
-                toggleGroup(group.id);
-              }
-            }
-            return next;
-          });
+        // Calculate next index
+        const nextIndex = e.key === 'ArrowDown'
+          ? (selectedSidebarIndex + 1) % totalSessions
+          : (selectedSidebarIndex - 1 + totalSessions) % totalSessions;
+
+        // Get the session we're about to navigate to
+        const nextSession = sortedSessions[nextIndex];
+
+        // If the session is in a group, check if that group is collapsed
+        if (nextSession?.groupId) {
+          const sessionGroup = groups.find(g => g.id === nextSession.groupId);
+          if (sessionGroup?.collapsed) {
+            // Expand the group before navigating
+            setGroups(prev => prev.map(g =>
+              g.id === sessionGroup.id ? { ...g, collapsed: false } : g
+            ));
+          }
         }
+
+        // Move to next session
+        setSelectedSidebarIndex(nextIndex);
         return;
       }
 
@@ -942,8 +943,8 @@ export default function MaestroConsole() {
         }
       }
       else if (isShortcut(e, 'cyclePrev')) {
-        // If right panel is focused, cycle through tabs; otherwise cycle sessions
-        if (activeFocus === 'right') {
+        // If right panel is focused OR file preview is open, cycle through tabs; otherwise cycle sessions
+        if (activeFocus === 'right' || previewFile !== null) {
           const tabs: RightPanelTab[] = ['files', 'history', 'scratchpad'];
           const currentIndex = tabs.indexOf(activeRightTab);
           const prevIndex = currentIndex === 0 ? tabs.length - 1 : currentIndex - 1;
@@ -959,8 +960,8 @@ export default function MaestroConsole() {
         }
       }
       else if (isShortcut(e, 'cycleNext')) {
-        // If right panel is focused, cycle through tabs; otherwise cycle sessions
-        if (activeFocus === 'right') {
+        // If right panel is focused OR file preview is open, cycle through tabs; otherwise cycle sessions
+        if (activeFocus === 'right' || previewFile !== null) {
           const tabs: RightPanelTab[] = ['files', 'history', 'scratchpad'];
           const currentIndex = tabs.indexOf(activeRightTab);
           const nextIndex = (currentIndex + 1) % tabs.length;
@@ -1719,7 +1720,13 @@ export default function MaestroConsole() {
 
         // Check if file should be opened externally
         if (shouldOpenExternally(node.name)) {
-          await window.maestro.shell.openExternal(`file://${fullPath}`);
+          // Show confirmation modal before opening externally
+          setConfirmModalMessage(`Open "${node.name}" in external application?`);
+          setConfirmModalOnConfirm(() => async () => {
+            await window.maestro.shell.openExternal(`file://${fullPath}`);
+            setConfirmModalOpen(false);
+          });
+          setConfirmModalOpen(true);
           return;
         }
 
@@ -1866,10 +1873,10 @@ export default function MaestroConsole() {
       const selectedElement = container.querySelector(`[data-file-index="${selectedFileIndex}"]`) as HTMLElement;
 
       if (selectedElement) {
-        // Use scrollIntoView with immediate scroll for instant feedback
+        // Use scrollIntoView with center alignment to avoid sticky header overlap
         selectedElement.scrollIntoView({
-          behavior: 'auto',  // Changed to 'auto' for immediate scroll
-          block: 'nearest',  // Scroll only if needed
+          behavior: 'auto',  // Immediate scroll
+          block: 'center',  // Center in viewport to avoid sticky header at top
           inline: 'nearest'
         });
       }

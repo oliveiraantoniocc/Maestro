@@ -262,72 +262,77 @@ export function MainPanel(props: MainPanelProps) {
             </div>
           </div>
 
-          {/* Logs Area */}
-          <TerminalOutput
-            ref={terminalOutputRef}
-            session={activeSession}
-            theme={theme}
-            activeFocus={activeFocus}
-            outputSearchOpen={outputSearchOpen}
-            outputSearchQuery={outputSearchQuery}
-            setOutputSearchOpen={setOutputSearchOpen}
-            setOutputSearchQuery={setOutputSearchQuery}
-            setActiveFocus={setActiveFocus}
-            setLightboxImage={setLightboxImage}
-            inputRef={inputRef}
-            logsEndRef={logsEndRef}
-            maxOutputLines={maxOutputLines}
-          />
+          {/* Show File Preview in main area when open, otherwise show terminal output and input */}
+          {previewFile ? (
+            <div className="flex-1 overflow-hidden">
+              <FilePreview
+                file={previewFile}
+                onClose={() => {
+                  setPreviewFile(null);
+                  setActiveFocus('right');
+                  setTimeout(() => {
+                    if (fileTreeContainerRef.current) {
+                      fileTreeContainerRef.current.focus();
+                    }
+                  }, 0);
+                }}
+                theme={theme}
+                markdownRawMode={markdownRawMode}
+                setMarkdownRawMode={setMarkdownRawMode}
+                shortcuts={shortcuts}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Logs Area */}
+              <TerminalOutput
+                ref={terminalOutputRef}
+                session={activeSession}
+                theme={theme}
+                activeFocus={activeFocus}
+                outputSearchOpen={outputSearchOpen}
+                outputSearchQuery={outputSearchQuery}
+                setOutputSearchOpen={setOutputSearchOpen}
+                setOutputSearchQuery={setOutputSearchQuery}
+                setActiveFocus={setActiveFocus}
+                setLightboxImage={setLightboxImage}
+                inputRef={inputRef}
+                logsEndRef={logsEndRef}
+                maxOutputLines={maxOutputLines}
+              />
 
-          {/* Input Area */}
-          <InputArea
-            session={activeSession}
-            theme={theme}
-            inputValue={inputValue}
-            setInputValue={setInputValue}
-            enterToSend={activeSession.inputMode === 'terminal' ? enterToSendTerminal : enterToSendAI}
-            setEnterToSend={activeSession.inputMode === 'terminal' ? setEnterToSendTerminal : setEnterToSendAI}
-            stagedImages={stagedImages}
-            setStagedImages={setStagedImages}
-            setLightboxImage={setLightboxImage}
-            commandHistoryOpen={commandHistoryOpen}
-            setCommandHistoryOpen={setCommandHistoryOpen}
-            commandHistoryFilter={commandHistoryFilter}
-            setCommandHistoryFilter={setCommandHistoryFilter}
-            commandHistorySelectedIndex={commandHistorySelectedIndex}
-            setCommandHistorySelectedIndex={setCommandHistorySelectedIndex}
-            slashCommandOpen={slashCommandOpen}
-            setSlashCommandOpen={setSlashCommandOpen}
-            slashCommands={slashCommands}
-            selectedSlashCommandIndex={selectedSlashCommandIndex}
-            setSelectedSlashCommandIndex={setSelectedSlashCommandIndex}
-            inputRef={inputRef}
-            handleInputKeyDown={handleInputKeyDown}
-            handlePaste={handlePaste}
-            handleDrop={handleDrop}
-            toggleInputMode={toggleInputMode}
-            processInput={processInput}
-            handleInterrupt={handleInterrupt}
-            onInputFocus={handleInputFocus}
-          />
-
-          {/* File Preview Overlay */}
-          {previewFile && (
-            <FilePreview
-              file={previewFile}
-              onClose={() => {
-                setPreviewFile(null);
-                setTimeout(() => {
-                  if (fileTreeContainerRef.current) {
-                    fileTreeContainerRef.current.focus();
-                  }
-                }, 0);
-              }}
-              theme={theme}
-              markdownRawMode={markdownRawMode}
-              setMarkdownRawMode={setMarkdownRawMode}
-              shortcuts={shortcuts}
-            />
+              {/* Input Area */}
+              <InputArea
+                session={activeSession}
+                theme={theme}
+                inputValue={inputValue}
+                setInputValue={setInputValue}
+                enterToSend={activeSession.inputMode === 'terminal' ? enterToSendTerminal : enterToSendAI}
+                setEnterToSend={activeSession.inputMode === 'terminal' ? setEnterToSendTerminal : setEnterToSendAI}
+                stagedImages={stagedImages}
+                setStagedImages={setStagedImages}
+                setLightboxImage={setLightboxImage}
+                commandHistoryOpen={commandHistoryOpen}
+                setCommandHistoryOpen={setCommandHistoryOpen}
+                commandHistoryFilter={commandHistoryFilter}
+                setCommandHistoryFilter={setCommandHistoryFilter}
+                commandHistorySelectedIndex={commandHistorySelectedIndex}
+                setCommandHistorySelectedIndex={setCommandHistorySelectedIndex}
+                slashCommandOpen={slashCommandOpen}
+                setSlashCommandOpen={setSlashCommandOpen}
+                slashCommands={slashCommands}
+                selectedSlashCommandIndex={selectedSlashCommandIndex}
+                setSelectedSlashCommandIndex={setSelectedSlashCommandIndex}
+                inputRef={inputRef}
+                handleInputKeyDown={handleInputKeyDown}
+                handlePaste={handlePaste}
+                handleDrop={handleDrop}
+                toggleInputMode={toggleInputMode}
+                processInput={processInput}
+                handleInterrupt={handleInterrupt}
+                onInputFocus={handleInputFocus}
+              />
+            </>
           )}
 
         </div>

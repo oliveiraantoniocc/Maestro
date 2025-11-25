@@ -210,6 +210,8 @@ export function QuickActionsModal(props: QuickActionsModalProps) {
       e.preventDefault();
       setSelectedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
       if (filtered[selectedIndex]) {
         const selectedAction = filtered[selectedIndex];
         // Don't close modal if action switches modes

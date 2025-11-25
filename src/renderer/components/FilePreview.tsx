@@ -111,6 +111,7 @@ export function FilePreview({ file, onClose, theme, markdownRawMode, setMarkdown
   const searchInputRef = useRef<HTMLInputElement>(null);
   const codeContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   if (!file) return null;
 
@@ -120,6 +121,11 @@ export function FilePreview({ file, onClose, theme, markdownRawMode, setMarkdown
 
   // Extract directory path without filename
   const directoryPath = file.path.substring(0, file.path.lastIndexOf('/'));
+
+  // Auto-focus on mount so keyboard shortcuts work immediately
+  useEffect(() => {
+    containerRef.current?.focus();
+  }, []); // Empty dependency array = only run on mount
 
   // Keep search input focused when search is open
   useEffect(() => {
@@ -306,11 +312,11 @@ export function FilePreview({ file, onClose, theme, markdownRawMode, setMarkdown
 
   return (
     <div
-      className="absolute inset-0 flex flex-col outline-none"
-      style={{ backgroundColor: theme.colors.bgMain, zIndex: 5 }}
+      ref={containerRef}
+      className="flex flex-col h-full outline-none"
+      style={{ backgroundColor: theme.colors.bgMain }}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      ref={(el) => el?.focus()}
     >
       {/* Header */}
       <div className="h-16 border-b flex items-center justify-between px-6 shrink-0" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}>
