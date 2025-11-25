@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { useLayerStack } from '../hooks/useLayerStack';
+import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 interface LightboxModalProps {
   image: string;
@@ -11,6 +13,36 @@ export function LightboxModal({ image, stagedImages, onClose, onNavigate }: Ligh
   const lightboxRef = useRef<HTMLDivElement>(null);
   const currentIndex = stagedImages.indexOf(image);
   const canNavigate = stagedImages.length > 1;
+  const layerIdRef = useRef<string>();
+  const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
+
+  // Register layer on mount
+  useEffect(() => {
+    const layerId = registerLayer({
+      type: 'overlay',
+      priority: MODAL_PRIORITIES.LIGHTBOX,
+      blocksLowerLayers: true,
+      capturesFocus: true,
+      focusTrap: 'none',
+      ariaLabel: 'Image Lightbox',
+      onEscape: onClose,
+      allowClickOutside: true
+    });
+    layerIdRef.current = layerId;
+
+    return () => {
+      if (layerIdRef.current) {
+        unregisterLayer(layerIdRef.current);
+      }
+    };
+  }, [registerLayer, unregisterLayer]);
+
+  // Update handler when onClose changes
+  useEffect(() => {
+    if (layerIdRef.current) {
+      updateLayerHandler(layerIdRef.current, onClose);
+    }
+  }, [onClose, updateLayerHandler]);
 
   useEffect(() => {
     // Focus the lightbox when it opens
@@ -38,9 +70,11 @@ export function LightboxModal({ image, stagedImages, onClose, onNavigate }: Ligh
         e.stopPropagation();
         if (e.key === 'ArrowLeft') { e.preventDefault(); goToPrev(); }
         else if (e.key === 'ArrowRight') { e.preventDefault(); goToNext(); }
-        else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
       }}
-      tabIndex={0}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image Lightbox"
     >
       {canNavigate && currentIndex > 0 && (
         <button
