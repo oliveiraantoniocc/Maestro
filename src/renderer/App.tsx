@@ -1,19 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  Terminal, Cpu, Plus, Settings, ChevronRight, ChevronDown, ChevronUp, Activity, Folder,
-  FileCode, FilePlus, FileDiff, Trash2, Sidebar, Key, FileText,
-  Wand2, Edit2, FolderPlus, X, Save, Eye, Columns, Keyboard, Image as ImageIcon,
-  Search, Zap, Moon, Sun, Monitor, Globe, Radio, Network, Share2, PanelLeftClose, PanelLeftOpen,
-  PanelRightClose, PanelRightOpen, ExternalLink, Wifi, ArrowUp, CornerDownLeft, Info
+  ChevronRight, ChevronDown, Folder
 } from 'lucide-react';
 import { NewInstanceModal } from './components/NewInstanceModal';
 import { SettingsModal } from './components/SettingsModal';
-import { Scratchpad } from './components/Scratchpad';
-import { FilePreview } from './components/FilePreview';
 import { SessionList } from './components/SessionList';
 import { RightPanel } from './components/RightPanel';
-import { TerminalOutput } from './components/TerminalOutput';
-import { InputArea } from './components/InputArea';
 import { QuickActionsModal } from './components/QuickActionsModal';
 import { LightboxModal } from './components/LightboxModal';
 import { ShortcutsHelpModal } from './components/ShortcutsHelpModal';
@@ -47,7 +39,7 @@ import type {
 import { THEMES } from './constants/themes';
 import { DEFAULT_SHORTCUTS } from './constants/shortcuts';
 import { generateId } from './utils/ids';
-import { getContextColor, getStatusColor, getFileIcon } from './utils/theme';
+import { getContextColor, getFileIcon } from './utils/theme';
 import { fuzzyMatch } from './utils/search';
 import { shouldOpenExternally, loadFileTree, getAllFolderPaths, flattenTree } from './utils/fileExplorer';
 
