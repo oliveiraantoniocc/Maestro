@@ -572,7 +572,7 @@ export default function MaestroConsole() {
     });
 
     // Handle Claude session ID capture from batch mode
-    const unsubscribeSessionId = window.maestro.process.onSessionId((sessionId: string, claudeSessionId: string) => {
+    const unsubscribeSessionId = window.maestro.process.onSessionId(async (sessionId: string, claudeSessionId: string) => {
       console.log('[onSessionId] Received Claude session ID:', claudeSessionId, 'for session:', sessionId);
 
       // Parse sessionId to get actual session ID
@@ -583,16 +583,33 @@ export default function MaestroConsole() {
         actualSessionId = sessionId;
       }
 
-      // Store Claude session ID in session state
-      setSessions(prev => prev.map(s => {
-        if (s.id !== actualSessionId) return s;
+      // Store Claude session ID in session state and fetch commands if not already cached
+      setSessions(prev => {
+        const session = prev.find(s => s.id === actualSessionId);
+        if (!session) return prev;
 
-        console.log('[onSessionId] Storing Claude session ID for session:', actualSessionId, 'claudeSessionId:', claudeSessionId);
-        return {
-          ...s,
-          claudeSessionId
-        };
-      }));
+        // Check if we need to fetch commands (only on first session establishment)
+        const needsCommandFetch = !session.claudeCommands && session.toolType === 'claude';
+
+        if (needsCommandFetch) {
+          // Fetch commands asynchronously and update session
+          window.maestro.claude.getCommands(session.cwd).then(commands => {
+            console.log('[onSessionId] Fetched Claude commands for session:', actualSessionId, commands.length, 'commands');
+            setSessions(prevSessions => prevSessions.map(s => {
+              if (s.id !== actualSessionId) return s;
+              return { ...s, claudeCommands: commands };
+            }));
+          }).catch(err => {
+            console.error('[onSessionId] Failed to fetch Claude commands:', err);
+          });
+        }
+
+        return prev.map(s => {
+          if (s.id !== actualSessionId) return s;
+          console.log('[onSessionId] Storing Claude session ID for session:', actualSessionId, 'claudeSessionId:', claudeSessionId);
+          return { ...s, claudeSessionId };
+        });
+      });
     });
 
     // Handle stderr from runCommand (separate from stdout)

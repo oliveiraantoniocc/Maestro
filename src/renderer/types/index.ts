@@ -151,6 +151,8 @@ export interface Session {
   messageQueue: LogEntry[];
   // Active time tracking - cumulative milliseconds of active use
   activeTimeMs: number;
+  // Claude Code slash commands available for this session (fetched per session based on cwd)
+  claudeCommands?: { command: string; description: string; }[];
 }
 
 export interface Group {

@@ -1131,6 +1131,102 @@ function setupIpcHandlers() {
     }
   });
 
+  // Get available Claude Code slash commands for a project directory
+  // Commands come from: user-defined commands, project-level commands, and enabled plugins
+  ipcMain.handle('claude:getCommands', async (_event, projectPath: string) => {
+    try {
+      const os = await import('os');
+      const homeDir = os.default.homedir();
+      const commands: Array<{ command: string; description: string }> = [];
+
+      // Helper to extract description from markdown file (first line of content or "No description")
+      const extractDescription = async (filePath: string): Promise<string> => {
+        try {
+          const content = await fs.readFile(filePath, 'utf-8');
+          // First non-empty line after any YAML frontmatter
+          const lines = content.split('\n');
+          let inFrontmatter = false;
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === '---') {
+              inFrontmatter = !inFrontmatter;
+              continue;
+            }
+            if (inFrontmatter) continue;
+            if (trimmed.length > 0) {
+              // Remove markdown formatting and truncate
+              return trimmed.replace(/^#+\s*/, '').slice(0, 100);
+            }
+          }
+          return 'No description';
+        } catch {
+          return 'No description';
+        }
+      };
+
+      // Helper to scan a commands directory for .md files
+      const scanCommandsDir = async (dir: string, prefix: string = '') => {
+        try {
+          const entries = await fs.readdir(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isFile() && entry.name.endsWith('.md')) {
+              const cmdName = entry.name.replace('.md', '');
+              const cmdPath = path.join(dir, entry.name);
+              const description = await extractDescription(cmdPath);
+              const command = prefix ? `/${prefix}:${cmdName}` : `/${cmdName}`;
+              commands.push({ command, description });
+            }
+          }
+        } catch {
+          // Directory doesn't exist or isn't readable
+        }
+      };
+
+      // 1. User-defined commands in ~/.claude/commands/
+      const userCommandsDir = path.join(homeDir, '.claude', 'commands');
+      await scanCommandsDir(userCommandsDir);
+
+      // 2. Project-level commands in <projectPath>/.claude/commands/
+      const projectCommandsDir = path.join(projectPath, '.claude', 'commands');
+      await scanCommandsDir(projectCommandsDir);
+
+      // 3. Enabled plugins' commands
+      // Read enabled plugins from settings
+      const settingsPath = path.join(homeDir, '.claude', 'settings.json');
+      try {
+        const settingsContent = await fs.readFile(settingsPath, 'utf-8');
+        const settings = JSON.parse(settingsContent);
+        const enabledPlugins = settings.enabledPlugins || {};
+
+        // Read installed plugins to get their install paths
+        const installedPluginsPath = path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json');
+        const installedContent = await fs.readFile(installedPluginsPath, 'utf-8');
+        const installedPlugins = JSON.parse(installedContent);
+
+        for (const pluginId of Object.keys(enabledPlugins)) {
+          if (!enabledPlugins[pluginId]) continue; // Skip disabled plugins
+
+          const pluginInfo = installedPlugins.plugins?.[pluginId];
+          if (!pluginInfo?.installPath) continue;
+
+          // Plugin commands are in <installPath>/commands/
+          const pluginCommandsDir = path.join(pluginInfo.installPath, 'commands');
+          // Extract plugin name (first part before @)
+          const pluginName = pluginId.split('@')[0];
+          await scanCommandsDir(pluginCommandsDir, pluginName);
+        }
+      } catch {
+        // Settings or installed plugins not readable
+      }
+
+      logger.info(`Found ${commands.length} Claude commands for project: ${projectPath}`, 'ClaudeCommands');
+      return commands;
+    } catch (error) {
+      logger.error('Error getting Claude commands', 'ClaudeCommands', error);
+      return [];
+    }
+  });
+
   // Temp file operations for batch processing
   ipcMain.handle('tempfile:write', async (_event, content: string, filename?: string) => {
     try {

@@ -69,7 +69,17 @@ export function InputArea(props: InputAreaProps) {
   const currentCommandHistory = isTerminalMode
     ? (shellHistory.length > 0 ? shellHistory : legacyHistory)
     : (aiHistory.length > 0 ? aiHistory : legacyHistory);
-  const filteredSlashCommands = slashCommands.filter(cmd => {
+
+  // Combine built-in slash commands with Claude-specific commands (for AI mode only)
+  const claudeCommands: SlashCommand[] = (session.claudeCommands || []).map(cmd => ({
+    command: cmd.command,
+    description: cmd.description,
+    aiOnly: true, // Claude commands are only available in AI mode
+  }));
+
+  const allSlashCommands = [...slashCommands, ...claudeCommands];
+
+  const filteredSlashCommands = allSlashCommands.filter(cmd => {
     // Check if command is only available in terminal mode
     if (cmd.terminalOnly && !isTerminalMode) return false;
     // Check if command is only available in AI mode

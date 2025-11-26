@@ -194,6 +194,8 @@ contextBridge.exposeInMainWorld('maestro', {
       ipcRenderer.invoke('claude:readSessionMessages', projectPath, sessionId, options),
     searchSessions: (projectPath: string, query: string, searchMode: 'title' | 'user' | 'assistant' | 'all') =>
       ipcRenderer.invoke('claude:searchSessions', projectPath, query, searchMode),
+    getCommands: (projectPath: string) =>
+      ipcRenderer.invoke('claude:getCommands', projectPath),
   },
 
   // Temp file API (for batch processing)
@@ -350,6 +352,10 @@ export interface MaestroAPI {
       matchType: 'title' | 'user' | 'assistant';
       matchPreview: string;
       matchCount: number;
+    }>>;
+    getCommands: (projectPath: string) => Promise<Array<{
+      command: string;
+      description: string;
     }>>;
   };
   tempfile: {
