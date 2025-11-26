@@ -13,7 +13,7 @@ export interface HistoryPanelHandle {
   focus: () => void;
 }
 
-export const HistoryPanel = forwardRef<HistoryPanelHandle, HistoryPanelProps>(function HistoryPanel({ session, theme, onJumpToClaudeSession }, ref) {
+export const HistoryPanel = React.memo(forwardRef<HistoryPanelHandle, HistoryPanelProps>(function HistoryPanel({ session, theme, onJumpToClaudeSession }, ref) {
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [activeFilters, setActiveFilters] = useState<Set<HistoryEntryType>>(new Set(['AUTO', 'USER']));
   const [isLoading, setIsLoading] = useState(true);
@@ -392,4 +392,4 @@ export const HistoryPanel = forwardRef<HistoryPanelHandle, HistoryPanelProps>(fu
       )}
     </div>
   );
-});
+}));

@@ -164,10 +164,13 @@ export function RightPanel(props: RightPanelProps) {
           }
         }}
         onScroll={(e) => {
-          const scrollTop = e.currentTarget.scrollTop;
-          setSessions(prev => prev.map(s =>
-            s.id === session.id ? { ...s, fileExplorerScrollPos: scrollTop } : s
-          ));
+          // Only track scroll position for file explorer tab
+          if (activeRightTab === 'files') {
+            const scrollTop = e.currentTarget.scrollTop;
+            setSessions(prev => prev.map(s =>
+              s.id === session.id ? { ...s, fileExplorerScrollPos: scrollTop } : s
+            ));
+          }
         }}
       >
         {activeRightTab === 'files' && (

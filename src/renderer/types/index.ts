@@ -216,15 +216,3 @@ export interface CustomAICommand {
   isBuiltIn?: boolean; // If true, cannot be deleted (only edited)
 }
 
-// Persistent global stats that survive app restarts
-export interface GlobalStats {
-  totalSessions: number;
-  totalMessages: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCacheReadTokens: number;
-  totalCacheCreationTokens: number;
-  totalCostUsd: number;
-  totalActiveTimeMs: number;
-  lastUpdated: number; // Timestamp for tracking when stats were last updated
-}

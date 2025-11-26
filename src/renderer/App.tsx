@@ -782,7 +782,10 @@ export default function MaestroConsole() {
 
   // Keyboard navigation state
   const [selectedSidebarIndex, setSelectedSidebarIndex] = useState(0);
-  const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0] || null;
+  const activeSession = useMemo(() =>
+    sessions.find(s => s.id === activeSessionId) || sessions[0] || null,
+    [sessions, activeSessionId]
+  );
   const theme = THEMES[activeThemeId];
   const anyTunnelActive = sessions.some(s => s.tunnelActive);
 
