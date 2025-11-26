@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wand2, Radio, ExternalLink, Wifi, Info, Columns, Copy, List } from 'lucide-react';
+import { Wand2, Radio, ExternalLink, Wifi, Info, Columns, Copy, List, Loader2 } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
 import { InputArea } from './InputArea';
@@ -8,7 +8,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { gitService } from '../services/git';
-import type { Session, Theme, Shortcut, FocusArea } from '../types';
+import type { Session, Theme, Shortcut, FocusArea, BatchRunState } from '../types';
 
 interface SlashCommand {
   command: string;
@@ -87,6 +87,11 @@ interface MainPanelProps {
   getContextColor: (usage: number, theme: Theme) => string;
   setActiveSessionId: (id: string) => void;
   onDeleteLog?: (logId: string) => void;
+
+  // Auto mode props
+  batchRunState?: BatchRunState;
+  onStopBatchRun?: () => void;
+  showConfirmation?: (message: string, onConfirm: () => void) => void;
 }
 
 export function MainPanel(props: MainPanelProps) {
@@ -102,13 +107,19 @@ export function MainPanel(props: MainPanelProps) {
     setSelectedSlashCommandIndex, setPreviewFile, setMarkdownRawMode,
     setAboutModalOpen, setRightPanelOpen, inputRef, logsEndRef, terminalOutputRef,
     fileTreeContainerRef, fileTreeFilterInputRef, toggleTunnel, toggleInputMode, processInput, handleInterrupt,
-    handleInputKeyDown, handlePaste, handleDrop, getContextColor, setActiveSessionId
+    handleInputKeyDown, handlePaste, handleDrop, getContextColor, setActiveSessionId,
+    batchRunState, onStopBatchRun, showConfirmation
   } = props;
+
+  const isAutoModeActive = batchRunState?.isRunning || false;
+  const isStopping = batchRunState?.isStopping || false;
 
   // Tunnel tooltip hover state
   const [tunnelTooltipOpen, setTunnelTooltipOpen] = useState(false);
   // Context window tooltip hover state
   const [contextTooltipOpen, setContextTooltipOpen] = useState(false);
+  // Session ID copied notification
+  const [showSessionIdCopied, setShowSessionIdCopied] = useState(false);
 
   // Handler for input focus - select session in sidebar
   const handleInputFocus = () => {
@@ -136,6 +147,18 @@ export function MainPanel(props: MainPanelProps) {
       await navigator.clipboard.writeText(text);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
+    }
+  };
+
+  // Copy session ID to clipboard with notification
+  const copySessionIdToClipboard = async () => {
+    if (!activeSession?.claudeSessionId) return;
+    try {
+      await navigator.clipboard.writeText(activeSession.claudeSessionId);
+      setShowSessionIdCopied(true);
+      setTimeout(() => setShowSessionIdCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy session ID to clipboard:', err);
     }
   };
 
@@ -266,15 +289,51 @@ export function MainPanel(props: MainPanelProps) {
 
               {/* Session ID - moved after Git Status */}
               {activeSession.inputMode === 'ai' && activeSession.claudeSessionId && (
-                <span
-                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+                <button
+                  onClick={copySessionIdToClipboard}
+                  className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ backgroundColor: theme.colors.accent + '20', color: theme.colors.accent, borderColor: theme.colors.accent + '30' }}
-                  title={`Session ID: ${activeSession.claudeSessionId}`}
+                  title={`Click to copy Session ID: ${activeSession.claudeSessionId}`}
                 >
                   {activeSession.claudeSessionId.split('-')[0].toUpperCase()}
-                </span>
+                </button>
               )}
             </div>
+
+            {/* Center: AUTO Mode Indicator */}
+            {isAutoModeActive && (
+              <button
+                onClick={() => {
+                  if (isStopping) return;
+                  showConfirmation?.(
+                    'Stop the batch run? The current task will complete before stopping.',
+                    () => onStopBatchRun?.()
+                  );
+                }}
+                disabled={isStopping}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all ${isStopping ? 'cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'}`}
+                style={{
+                  backgroundColor: theme.colors.error,
+                  color: 'white'
+                }}
+                title={isStopping ? 'Stopping after current task...' : 'Click to stop batch run'}
+              >
+                {isStopping ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Wand2 className="w-5 h-5" />
+                )}
+                <span className="uppercase tracking-wider">
+                  {isStopping ? 'Stopping...' : 'Auto'}
+                </span>
+                {batchRunState && (
+                  <span className="text-xs opacity-80">
+                    {batchRunState.completedTasks}/{batchRunState.totalTasks}
+                  </span>
+                )}
+              </button>
+            )}
+
             <div className="flex items-center gap-3">
               {/* Cost Tracker - styled as pill */}
               {activeSession.inputMode === 'ai' && activeSession.usageStats && activeSession.usageStats.totalCostUsd > 0 && (
@@ -457,11 +516,26 @@ export function MainPanel(props: MainPanelProps) {
                 processInput={processInput}
                 handleInterrupt={handleInterrupt}
                 onInputFocus={handleInputFocus}
+                isAutoModeActive={isAutoModeActive}
               />
             </>
           )}
 
         </div>
+
+        {/* Session ID Copied Notification Toast */}
+        {showSessionIdCopied && (
+          <div
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-6 py-4 rounded-lg shadow-2xl text-base font-bold animate-in fade-in zoom-in-95 duration-200 z-50"
+            style={{
+              backgroundColor: theme.colors.accent,
+              color: '#FFFFFF',
+              textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            Session ID Copied to Clipboard
+          </div>
+        )}
       </ErrorBoundary>
     </>
   );

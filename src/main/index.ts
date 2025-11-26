@@ -80,6 +80,28 @@ const agentConfigsStore = new Store<AgentConfigsData>({
   },
 });
 
+// History entries store (per-project history for AUTO and USER entries)
+interface HistoryEntry {
+  id: string;
+  type: 'AUTO' | 'USER';
+  timestamp: number;
+  summary: string;
+  fullResponse?: string;
+  claudeSessionId?: string;
+  projectPath: string;
+}
+
+interface HistoryData {
+  entries: HistoryEntry[];
+}
+
+const historyStore = new Store<HistoryData>({
+  name: 'maestro-history',
+  defaults: {
+    entries: [],
+  },
+});
+
 let mainWindow: BrowserWindow | null = null;
 let processManager: ProcessManager | null = null;
 let webServer: WebServer | null = null;
@@ -971,6 +993,80 @@ function setupIpcHandlers() {
       logger.error('Error searching Claude sessions', 'ClaudeSessions', error);
       return [];
     }
+  });
+
+  // Temp file operations for batch processing
+  ipcMain.handle('tempfile:write', async (_event, content: string, filename?: string) => {
+    try {
+      const os = await import('os');
+      const tempDir = os.default.tmpdir();
+      const finalFilename = filename || `maestro-scratchpad-${Date.now()}.md`;
+      const tempPath = path.join(tempDir, finalFilename);
+
+      await fs.writeFile(tempPath, content, 'utf-8');
+      logger.info(`Wrote temp file: ${tempPath}`, 'TempFile', { size: content.length });
+      return { success: true, path: tempPath };
+    } catch (error) {
+      logger.error('Error writing temp file', 'TempFile', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('tempfile:read', async (_event, filePath: string) => {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      logger.info(`Read temp file: ${filePath}`, 'TempFile', { size: content.length });
+      return { success: true, content };
+    } catch (error) {
+      logger.error('Error reading temp file', 'TempFile', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('tempfile:delete', async (_event, filePath: string) => {
+    try {
+      await fs.unlink(filePath);
+      logger.info(`Deleted temp file: ${filePath}`, 'TempFile');
+      return { success: true };
+    } catch (error) {
+      logger.error('Error deleting temp file', 'TempFile', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // History persistence (per-project)
+  ipcMain.handle('history:getAll', async (_event, projectPath?: string) => {
+    const allEntries = historyStore.get('entries', []);
+    if (projectPath) {
+      // Filter by project path
+      return allEntries.filter(entry => entry.projectPath === projectPath);
+    }
+    return allEntries;
+  });
+
+  ipcMain.handle('history:add', async (_event, entry: HistoryEntry) => {
+    const entries = historyStore.get('entries', []);
+    entries.unshift(entry); // Add to beginning (most recent first)
+    // Keep only last 1000 entries to prevent unbounded growth
+    const trimmedEntries = entries.slice(0, 1000);
+    historyStore.set('entries', trimmedEntries);
+    logger.info(`Added history entry: ${entry.type}`, 'History', { summary: entry.summary });
+    return true;
+  });
+
+  ipcMain.handle('history:clear', async (_event, projectPath?: string) => {
+    if (projectPath) {
+      // Clear only entries for this project
+      const entries = historyStore.get('entries', []);
+      const filtered = entries.filter(entry => entry.projectPath !== projectPath);
+      historyStore.set('entries', filtered);
+      logger.info(`Cleared history for project: ${projectPath}`, 'History');
+    } else {
+      // Clear all entries
+      historyStore.set('entries', []);
+      logger.info('Cleared all history', 'History');
+    }
+    return true;
   });
 }
 

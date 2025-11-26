@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Wand2, Plus, Settings, ChevronRight, ChevronDown, Activity, X, Keyboard,
-  Globe, Network, PanelLeftClose, PanelLeftOpen, Folder, Info, FileText, GitBranch
+  Globe, Network, PanelLeftClose, PanelLeftOpen, Folder, Info, FileText, GitBranch, Bot
 } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut } from '../types';
 import { getStatusColor, getContextColor } from '../utils/theme';
@@ -47,6 +47,9 @@ interface SessionListProps {
   setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
   createNewGroup: () => void;
   addNewSession: () => void;
+
+  // Auto mode props
+  activeBatchSessionIds?: string[]; // Session IDs that are running in auto mode
 }
 
 export function SessionList(props: SessionListProps) {
@@ -58,7 +61,8 @@ export function SessionList(props: SessionListProps) {
     setShortcutsHelpOpen, setSettingsModalOpen, setSettingsTab, setAboutModalOpen, setLogViewerOpen, toggleGroup,
     handleDragStart, handleDragOver, handleDropOnGroup, handleDropOnUngrouped,
     finishRenamingGroup, finishRenamingSession, startRenamingGroup,
-    startRenamingSession, showConfirmation, setGroups, createNewGroup, addNewSession
+    startRenamingSession, showConfirmation, setGroups, createNewGroup, addNewSession,
+    activeBatchSessionIds = []
   } = props;
 
   const [sessionFilter, setSessionFilter] = useState('');
@@ -336,6 +340,17 @@ export function SessionList(props: SessionListProps) {
                                 <span>{gitFileCounts.get(session.id)}</span>
                               </div>
                             )}
+                            {/* AUTO Mode Indicator */}
+                            {activeBatchSessionIds.includes(session.id) && (
+                              <div
+                                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
+                                style={{ backgroundColor: theme.colors.warning + '30', color: theme.colors.warning }}
+                                title="Auto mode running"
+                              >
+                                <Bot className="w-2.5 h-2.5" />
+                                AUTO
+                              </div>
+                            )}
                             {/* AI Status Indicator */}
                             <div
                               className={`w-2 h-2 rounded-full ${session.state === 'connecting' ? 'animate-pulse' : ''}`}
@@ -446,6 +461,17 @@ export function SessionList(props: SessionListProps) {
                       <div className="flex items-center gap-0.5 text-[10px]" style={{ color: theme.colors.warning }}>
                         <GitBranch className="w-2.5 h-2.5" />
                         <span>{gitFileCounts.get(session.id)}</span>
+                      </div>
+                    )}
+                    {/* AUTO Mode Indicator */}
+                    {activeBatchSessionIds.includes(session.id) && (
+                      <div
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
+                        style={{ backgroundColor: theme.colors.warning + '30', color: theme.colors.warning }}
+                        title="Auto mode running"
+                      >
+                        <Bot className="w-2.5 h-2.5" />
+                        AUTO
                       </div>
                     )}
                     {/* AI Status Indicator */}

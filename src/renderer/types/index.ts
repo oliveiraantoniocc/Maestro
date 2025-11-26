@@ -60,6 +60,32 @@ export interface WorkLogItem {
   relatedFiles?: number;
 }
 
+// History entry types for the History panel
+export type HistoryEntryType = 'AUTO' | 'USER';
+
+export interface HistoryEntry {
+  id: string;
+  type: HistoryEntryType;
+  timestamp: number;
+  summary: string;
+  fullResponse?: string; // Complete agent response for expansion
+  claudeSessionId?: string; // For clicking to jump to session
+  projectPath: string; // For per-project filtering
+}
+
+// Batch processing state
+export interface BatchRunState {
+  isRunning: boolean;
+  isStopping: boolean; // Waiting for current task to finish before stopping
+  totalTasks: number;
+  completedTasks: number;
+  currentTaskIndex: number;
+  scratchpadPath?: string; // Path to temp file
+  originalContent: string; // Original scratchpad content for sync back
+  customPrompt?: string; // User's custom prompt if modified
+  sessionIds: string[]; // Claude session IDs from each iteration
+}
+
 // Usage statistics from Claude Code CLI
 export interface UsageStats {
   inputTokens: number;
@@ -101,8 +127,9 @@ export interface Session {
   fileTreeError?: string;
   // Shell state tracking
   shellCwd?: string;
-  // Command history
-  commandHistory?: string[];
+  // Command history (separate for each mode)
+  aiCommandHistory?: string[];
+  shellCommandHistory?: string[];
   // Scratchpad state tracking
   scratchPadCursorPosition?: number;
   scratchPadEditScrollPos?: number;
@@ -112,6 +139,8 @@ export interface Session {
   claudeSessionId?: string;
   // Pending jump path for /jump command (relative path within file tree)
   pendingJumpPath?: string;
+  // Custom status message for the thinking indicator (e.g., "Agent is synopsizing...")
+  statusMessage?: string;
 }
 
 export interface Group {

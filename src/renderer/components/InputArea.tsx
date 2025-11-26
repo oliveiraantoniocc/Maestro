@@ -1,11 +1,12 @@
 import React from 'react';
-import { Terminal, Cpu, Keyboard, ImageIcon, X, ArrowUp, StopCircle } from 'lucide-react';
+import { Terminal, Cpu, Keyboard, ImageIcon, X, ArrowUp, StopCircle, Eye } from 'lucide-react';
 import type { Session, Theme } from '../types';
 
 interface SlashCommand {
   command: string;
   description: string;
   terminalOnly?: boolean;
+  aiOnly?: boolean;
 }
 
 interface InputAreaProps {
@@ -37,6 +38,8 @@ interface InputAreaProps {
   processInput: () => void;
   handleInterrupt: () => void;
   onInputFocus: () => void;
+  // Auto mode props
+  isAutoModeActive?: boolean;
 }
 
 export function InputArea(props: InputAreaProps) {
@@ -48,14 +51,26 @@ export function InputArea(props: InputAreaProps) {
     slashCommandOpen, setSlashCommandOpen, slashCommands,
     selectedSlashCommandIndex, setSelectedSlashCommandIndex,
     inputRef, handleInputKeyDown, handlePaste, handleDrop,
-    toggleInputMode, processInput, handleInterrupt, onInputFocus
+    toggleInputMode, processInput, handleInterrupt, onInputFocus,
+    isAutoModeActive = false
   } = props;
+
+  // Check if we're in read-only mode (auto mode in AI mode - user can still send but Claude will be in plan mode)
+  const isReadOnlyMode = isAutoModeActive && session.inputMode === 'ai';
 
   // Filter slash commands based on input and current mode
   const isTerminalMode = session.inputMode === 'terminal';
+
+  // Get the appropriate command history based on current mode
+  // Each mode has its own separate history - no cross-contamination
+  const currentCommandHistory = isTerminalMode
+    ? (session.shellCommandHistory || [])
+    : (session.aiCommandHistory || []);
   const filteredSlashCommands = slashCommands.filter(cmd => {
     // Check if command is only available in terminal mode
     if (cmd.terminalOnly && !isTerminalMode) return false;
+    // Check if command is only available in AI mode
+    if (cmd.aiOnly && isTerminalMode) return false;
     // Check if command matches input
     return cmd.command.toLowerCase().startsWith(inputValue.toLowerCase());
   });
@@ -107,6 +122,8 @@ export function InputArea(props: InputAreaProps) {
                   setInputValue(cmd.command);
                   setSlashCommandOpen(false);
                   inputRef.current?.focus();
+                  // Execute the command after a brief delay to let state update
+                  setTimeout(() => processInput(), 10);
                 }}
                 onMouseEnter={() => setSelectedSlashCommandIndex(idx)}
               >
@@ -124,9 +141,8 @@ export function InputArea(props: InputAreaProps) {
           className="absolute bottom-full left-0 right-0 mb-2 border rounded-lg shadow-2xl max-h-64 overflow-hidden"
           style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
           onKeyDown={(e) => {
-            const history = session.commandHistory || [];
             // Dedupe history before filtering
-            const uniqueHistory = Array.from(new Set(history));
+            const uniqueHistory = Array.from(new Set(currentCommandHistory));
             const filtered = uniqueHistory.filter(cmd =>
               cmd.toLowerCase().includes(commandHistoryFilter.toLowerCase())
             ).reverse().slice(0, 5);
@@ -139,17 +155,20 @@ export function InputArea(props: InputAreaProps) {
               setCommandHistorySelectedIndex(Math.max(commandHistorySelectedIndex - 1, 0));
             } else if (e.key === 'Enter') {
               e.preventDefault();
+              e.stopPropagation();
               if (filtered[commandHistorySelectedIndex]) {
                 setInputValue(filtered[commandHistorySelectedIndex]);
                 setCommandHistoryOpen(false);
                 setCommandHistoryFilter('');
-                inputRef.current?.focus();
+                setTimeout(() => inputRef.current?.focus(), 0);
               }
             } else if (e.key === 'Escape') {
               e.preventDefault();
+              e.stopPropagation();
               setCommandHistoryOpen(false);
               setCommandHistoryFilter('');
-              inputRef.current?.focus();
+              // Focus back to the main input
+              setTimeout(() => inputRef.current?.focus(), 0);
             }
           }}
         >
@@ -168,7 +187,7 @@ export function InputArea(props: InputAreaProps) {
             />
           </div>
           <div className="max-h-48 overflow-y-auto">
-            {Array.from(new Set(session.commandHistory || []))
+            {Array.from(new Set(currentCommandHistory))
               .filter(cmd => cmd.toLowerCase().includes(commandHistoryFilter.toLowerCase()))
               .reverse()
               .slice(0, 5)
@@ -198,7 +217,7 @@ export function InputArea(props: InputAreaProps) {
                   </div>
                 );
               })}
-            {(session.commandHistory || []).filter(cmd =>
+            {currentCommandHistory.filter(cmd =>
               cmd.toLowerCase().includes(commandHistoryFilter.toLowerCase())
             ).length === 0 && (
               <div className="px-3 py-4 text-center text-sm opacity-50">No matching commands</div>
@@ -208,7 +227,13 @@ export function InputArea(props: InputAreaProps) {
       )}
 
       <div className="flex gap-3">
-        <div className="flex-1 relative border rounded-lg bg-opacity-50 flex flex-col" style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}>
+        <div
+          className="flex-1 relative border rounded-lg bg-opacity-50 flex flex-col"
+          style={{
+            borderColor: isReadOnlyMode ? theme.colors.warning : theme.colors.border,
+            backgroundColor: isReadOnlyMode ? `${theme.colors.warning}15` : theme.colors.bgMain
+          }}
+        >
           <div className="flex items-start">
             {/* Terminal mode prefix */}
             {isTerminalMode && (
@@ -223,30 +248,30 @@ export function InputArea(props: InputAreaProps) {
               ref={inputRef}
               className={`flex-1 bg-transparent text-sm outline-none ${isTerminalMode ? 'pl-1.5' : 'pl-3'} pt-3 pr-3 resize-none min-h-[2.5rem] max-h-[8rem] scrollbar-thin`}
               style={{ color: theme.colors.textMain }}
-              placeholder={isTerminalMode ? "Run shell command..." : "Ask Claude..."}
-            value={inputValue}
-            onFocus={onInputFocus}
-            onChange={e => {
-              const value = e.target.value;
-              setInputValue(value);
+              placeholder={isReadOnlyMode ? "Auto mode active - Claude in read-only mode..." : (isTerminalMode ? "Run shell command..." : "Ask Claude...")}
+              value={inputValue}
+              onFocus={onInputFocus}
+              onChange={e => {
+                const value = e.target.value;
+                setInputValue(value);
 
-              // Show slash command autocomplete when typing /
-              if (value.startsWith('/') && !value.includes(' ')) {
-                setSlashCommandOpen(true);
-                setSelectedSlashCommandIndex(0);
-              } else {
-                setSlashCommandOpen(false);
-              }
+                // Show slash command autocomplete when typing /
+                if (value.startsWith('/') && !value.includes(' ')) {
+                  setSlashCommandOpen(true);
+                  setSelectedSlashCommandIndex(0);
+                } else {
+                  setSlashCommandOpen(false);
+                }
 
-              // Auto-grow logic
-              e.target.style.height = 'auto';
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`;
-            }}
-            onKeyDown={handleInputKeyDown}
-            onPaste={handlePaste}
-            onDrop={handleDrop}
-            onDragOver={e => e.preventDefault()}
-            rows={1}
+                // Auto-grow logic
+                e.target.style.height = 'auto';
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 128)}px`;
+              }}
+              onKeyDown={handleInputKeyDown}
+              onPaste={handlePaste}
+              onDrop={handleDrop}
+              onDragOver={e => e.preventDefault()}
+              rows={1}
             />
           </div>
 
@@ -287,6 +312,23 @@ export function InputArea(props: InputAreaProps) {
                 }}
               />
             </div>
+
+            {/* READ-ONLY pill - center */}
+            {isReadOnlyMode && (
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide"
+                style={{
+                  backgroundColor: `${theme.colors.warning}25`,
+                  color: theme.colors.warning,
+                  border: `1px solid ${theme.colors.warning}50`
+                }}
+                title="Auto mode active - Claude will operate in read-only/plan mode"
+              >
+                <Eye className="w-3 h-3" />
+                Read-Only
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setEnterToSend(!enterToSend)}
@@ -326,7 +368,7 @@ export function InputArea(props: InputAreaProps) {
           ) : (
             <button
               onClick={processInput}
-              className="p-2 rounded-md text-white hover:opacity-90 shadow-sm transition-all"
+              className="p-2 rounded-md text-white shadow-sm transition-all hover:opacity-90"
               style={{ backgroundColor: theme.colors.accent }}
             >
               <ArrowUp className="w-4 h-4" />

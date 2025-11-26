@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Eye, Edit } from 'lucide-react';
+import { Eye, Edit, Play, Square, Loader2, HelpCircle } from 'lucide-react';
+import type { BatchRunState } from '../types';
+import { AutoRunnerHelpModal } from './AutoRunnerHelpModal';
 
 interface ScratchpadProps {
   content: string;
@@ -17,6 +19,10 @@ interface ScratchpadProps {
     editScrollPos: number;
     previewScrollPos: number;
   }) => void;
+  // Batch processing props
+  batchRunState?: BatchRunState;
+  onOpenBatchRunner?: () => void;
+  onStopBatchRun?: () => void;
 }
 
 export function Scratchpad({
@@ -27,9 +33,15 @@ export function Scratchpad({
   initialCursorPosition = 0,
   initialEditScrollPos = 0,
   initialPreviewScrollPos = 0,
-  onStateChange
+  onStateChange,
+  batchRunState,
+  onOpenBatchRunner,
+  onStopBatchRun
 }: ScratchpadProps) {
+  const isLocked = batchRunState?.isRunning || false;
+  const isStopping = batchRunState?.isStopping || false;
   const [mode, setMode] = useState<'edit' | 'preview'>(initialMode);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -207,10 +219,11 @@ export function Scratchpad({
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-3 justify-center pt-2">
         <button
-          onClick={() => setMode('edit')}
+          onClick={() => !isLocked && setMode('edit')}
+          disabled={isLocked}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
             mode === 'edit' ? 'font-semibold' : ''
-          }`}
+          } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{
             backgroundColor: mode === 'edit' ? theme.colors.bgActivity : 'transparent',
             color: mode === 'edit' ? theme.colors.textMain : theme.colors.textDim,
@@ -221,10 +234,11 @@ export function Scratchpad({
           Edit
         </button>
         <button
-          onClick={() => setMode('preview')}
+          onClick={() => !isLocked && setMode('preview')}
+          disabled={isLocked}
           className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors ${
             mode === 'preview' ? 'font-semibold' : ''
-          }`}
+          } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{
             backgroundColor: mode === 'preview' ? theme.colors.bgActivity : 'transparent',
             color: mode === 'preview' ? theme.colors.textMain : theme.colors.textDim,
@@ -234,6 +248,50 @@ export function Scratchpad({
           <Eye className="w-3.5 h-3.5" />
           Preview
         </button>
+        {/* Help button */}
+        <button
+          onClick={() => setHelpModalOpen(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-full transition-colors hover:bg-white/10"
+          style={{ color: theme.colors.textDim }}
+          title="Learn about Auto Runner"
+        >
+          <HelpCircle className="w-4 h-4" />
+        </button>
+        {/* Run / Stop button */}
+        {isLocked ? (
+          <button
+            onClick={onStopBatchRun}
+            disabled={isStopping}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors font-semibold ${isStopping ? 'opacity-50 cursor-not-allowed' : ''}`}
+            style={{
+              backgroundColor: theme.colors.error,
+              color: 'white',
+              border: `1px solid ${theme.colors.error}`
+            }}
+            title={isStopping ? 'Stopping after current task...' : 'Stop batch run'}
+          >
+            {isStopping ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Square className="w-3.5 h-3.5" />
+            )}
+            {isStopping ? 'Stopping...' : 'Stop'}
+          </button>
+        ) : (
+          <button
+            onClick={onOpenBatchRunner}
+            className="flex items-center gap-2 px-3 py-1.5 rounded text-xs transition-colors hover:opacity-90"
+            style={{
+              backgroundColor: theme.colors.accent,
+              color: 'white',
+              border: `1px solid ${theme.colors.accent}`
+            }}
+            title="Run batch processing on scratchpad tasks"
+          >
+            <Play className="w-3.5 h-3.5" />
+            Run
+          </button>
+        )}
       </div>
 
       {/* Content Area */}
@@ -242,16 +300,18 @@ export function Scratchpad({
           <textarea
             ref={textareaRef}
             value={content}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={(e) => !isLocked && onChange(e.target.value)}
+            onKeyDown={!isLocked ? handleKeyDown : undefined}
             onKeyUp={handleCursorOrScrollChange}
             onClick={handleCursorOrScrollChange}
             onScroll={handleCursorOrScrollChange}
             placeholder="Write your notes in markdown..."
-            className="w-full h-full border rounded p-4 bg-transparent outline-none resize-none font-mono text-sm"
+            readOnly={isLocked}
+            className={`w-full h-full border rounded p-4 bg-transparent outline-none resize-none font-mono text-sm ${isLocked ? 'cursor-not-allowed opacity-70' : ''}`}
             style={{
-              borderColor: theme.colors.border,
-              color: theme.colors.textMain
+              borderColor: isLocked ? theme.colors.warning : theme.colors.border,
+              color: theme.colors.textMain,
+              backgroundColor: isLocked ? theme.colors.bgActivity + '30' : 'transparent'
             }}
           />
         ) : (
@@ -300,6 +360,55 @@ export function Scratchpad({
           </div>
         )}
       </div>
+
+      {/* Batch Run Progress */}
+      {batchRunState && batchRunState.isRunning && (
+        <div
+          className="mt-3 px-4 py-3 rounded border"
+          style={{
+            backgroundColor: theme.colors.bgActivity,
+            borderColor: theme.colors.warning
+          }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.warning }} />
+              <span className="text-xs font-bold uppercase" style={{ color: theme.colors.textMain }}>
+                {isStopping ? 'Stopping...' : 'Auto Mode Running'}
+              </span>
+            </div>
+            <span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
+              {batchRunState.completedTasks} / {batchRunState.totalTasks} tasks
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div
+            className="h-1.5 rounded-full overflow-hidden"
+            style={{ backgroundColor: theme.colors.border }}
+          >
+            <div
+              className="h-full transition-all duration-500 ease-out"
+              style={{
+                width: `${batchRunState.totalTasks > 0 ? (batchRunState.completedTasks / batchRunState.totalTasks) * 100 : 0}%`,
+                backgroundColor: isStopping ? theme.colors.error : theme.colors.warning
+              }}
+            />
+          </div>
+          <div className="mt-2 text-[10px]" style={{ color: theme.colors.textDim }}>
+            {isStopping
+              ? 'Waiting for current task to complete before stopping...'
+              : `Task ${batchRunState.currentTaskIndex + 1} in progress...`}
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {helpModalOpen && (
+        <AutoRunnerHelpModal
+          theme={theme}
+          onClose={() => setHelpModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

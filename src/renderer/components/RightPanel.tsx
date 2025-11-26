@@ -1,6 +1,6 @@
 import React from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import type { Session, Theme, RightPanelTab, Shortcut } from '../types';
+import type { Session, Theme, RightPanelTab, Shortcut, BatchRunState } from '../types';
 import { FileExplorerPanel } from './FileExplorerPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { Scratchpad } from './Scratchpad';
@@ -53,6 +53,12 @@ interface RightPanelProps {
     editScrollPos: number;
     previewScrollPos: number;
   }) => void;
+
+  // Batch processing props
+  batchRunState?: BatchRunState;
+  onOpenBatchRunner?: () => void;
+  onStopBatchRun?: () => void;
+  onJumpToClaudeSession?: (claudeSessionId: string) => void;
 }
 
 export function RightPanel(props: RightPanelProps) {
@@ -62,7 +68,8 @@ export function RightPanel(props: RightPanelProps) {
     fileTreeFilter, setFileTreeFilter, fileTreeFilterOpen, setFileTreeFilterOpen,
     filteredFileTree, selectedFileIndex, setSelectedFileIndex, previewFile, fileTreeContainerRef,
     fileTreeFilterInputRef, toggleFolder, handleFileClick, expandAllFolders, collapseAllFolders,
-    updateSessionWorkingDirectory, setSessions, updateScratchPad, updateScratchPadState
+    updateSessionWorkingDirectory, setSessions, updateScratchPad, updateScratchPadState,
+    batchRunState, onOpenBatchRunner, onStopBatchRun, onJumpToClaudeSession
   } = props;
 
   if (!session) return null;
@@ -117,27 +124,19 @@ export function RightPanel(props: RightPanelProps) {
           {rightPanelOpen ? <PanelRightClose className="w-4 h-4 opacity-50" /> : <PanelRightOpen className="w-4 h-4 opacity-50" />}
         </button>
 
-        {['files', 'history', 'scratchpad'].map(tab => {
-          const isHistoryTab = tab === 'history';
-          const isDisabled = isHistoryTab && session.inputMode !== 'ai';
-
-          return (
-            <button
-              key={tab}
-              onClick={() => !isDisabled && setActiveRightTab(tab as RightPanelTab)}
-              disabled={isDisabled}
-              className="flex-1 text-xs font-bold border-b-2 capitalize transition-colors disabled:cursor-not-allowed"
-              style={{
-                borderColor: activeRightTab === tab ? theme.colors.accent : 'transparent',
-                color: isDisabled ? theme.colors.textDim + '40' : (activeRightTab === tab ? theme.colors.textMain : theme.colors.textDim),
-                opacity: isDisabled ? 0.3 : 1
-              }}
-              title={isDisabled ? 'History is only available in AI mode' : undefined}
-            >
-              {tab}
-            </button>
-          );
-        })}
+        {['files', 'history', 'scratchpad'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveRightTab(tab as RightPanelTab)}
+            className="flex-1 text-xs font-bold border-b-2 capitalize transition-colors"
+            style={{
+              borderColor: activeRightTab === tab ? theme.colors.accent : 'transparent',
+              color: activeRightTab === tab ? theme.colors.textMain : theme.colors.textDim
+            }}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
@@ -147,7 +146,10 @@ export function RightPanel(props: RightPanelProps) {
         tabIndex={-1}
         onClick={() => {
           setActiveFocus('right');
-          fileTreeContainerRef.current?.focus();
+          // Only focus the container for file explorer, not for scratchpad (which has its own focus management)
+          if (activeRightTab === 'files') {
+            fileTreeContainerRef.current?.focus();
+          }
         }}
         onScroll={(e) => {
           const scrollTop = e.currentTarget.scrollTop;
@@ -183,7 +185,11 @@ export function RightPanel(props: RightPanelProps) {
         )}
 
         {activeRightTab === 'history' && (
-          <HistoryPanel session={session} theme={theme} />
+          <HistoryPanel
+            session={session}
+            theme={theme}
+            onJumpToClaudeSession={onJumpToClaudeSession}
+          />
         )}
 
         {activeRightTab === 'scratchpad' && (
@@ -196,6 +202,9 @@ export function RightPanel(props: RightPanelProps) {
             initialEditScrollPos={session.scratchPadEditScrollPos || 0}
             initialPreviewScrollPos={session.scratchPadPreviewScrollPos || 0}
             onStateChange={updateScratchPadState}
+            batchRunState={batchRunState}
+            onOpenBatchRunner={onOpenBatchRunner}
+            onStopBatchRun={onStopBatchRun}
           />
         )}
       </div>

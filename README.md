@@ -22,13 +22,15 @@ Download the latest release for your platform from the [Releases](https://github
 ## Features
 
 - 🚀 **Multi-Instance Management** - Run multiple Claude Code instances and Command Terminal sessions simultaneously
+- 🤖 **Automatic Runner** - Batch-process tasks using AI agents with serial execution, history tracking, and saved session per task
 - 🔄 **Dual-Mode Input** - Switch between Command Terminal and AI Terminal seamlessly
-- ⌨️ **Keyboard-First Navigation** - Full keyboard control with customizable shortcuts
+- ⌨️ **Keyboard-First Design** - Built for fast flow with full keyboard control, customizable shortcuts, and rapid navigation
+- 🔍 **Powerful Output Filtering** - Search, filter, and navigate output with include/exclude modes and per-response local filters
 - 🎨 **Beautiful Themes** - 12 themes including Dracula, Monokai, Nord, Tokyo Night, GitHub Light, and more
 - 🔀 **Git Integration** - Automatic git status, diff tracking, and workspace detection
 - 📁 **File Explorer** - Browse project files with syntax highlighting and markdown preview
 - 📋 **Session Management** - Group, rename, and organize your sessions
-- 📝 **Scratchpad** - Built-in markdown editor with live preview
+- 📝 **Scratchpad** - Built-in markdown editor with live preview for task management
 - ⚡ **Slash Commands** - Extensible command system with autocomplete
 - 🌐 **Remote Access** - Built-in web server with optional ngrok/Cloudflare tunneling
 - 💰 **Cost Tracking** - Real-time token usage and cost tracking per session
@@ -135,6 +137,65 @@ Maestro includes an extensible slash command system with autocomplete:
 | `/jump` | Jump to current working directory in file tree (terminal mode only) |
 
 Type `/` in the input area to open the autocomplete menu, use arrow keys to navigate, and press `Tab` or `Enter` to select.
+
+## Automatic Runner
+
+The Automatic Runner lets you batch-process tasks using AI agents. Define your tasks as markdown checkboxes in the Scratchpad, and Maestro will work through them one by one, spawning a fresh AI session for each task.
+
+### Creating Tasks
+
+Use markdown checkboxes in the Scratchpad tab:
+
+```markdown
+- [ ] Implement user authentication
+- [ ] Add unit tests for the login flow
+- [ ] Update API documentation
+```
+
+**Tip**: Press `Cmd+L` (Mac) or `Ctrl+L` (Windows/Linux) to quickly insert a new checkbox at your cursor position.
+
+### Running the Automation
+
+1. Navigate to the **Scratchpad** tab in the right panel
+2. Add your tasks as unchecked markdown checkboxes (`- [ ]`)
+3. Click the **Run** button (or the ▶ icon)
+4. Customize the agent prompt if needed, then click **Go**
+
+The runner will:
+- Process tasks serially from top to bottom
+- Spawn a fresh AI session for each task
+- Mark tasks as complete (`- [x]`) when done
+- Log each completion to the **History** panel
+
+### History & Tracking
+
+Each completed task is logged to the History panel with:
+- **AUTO** label indicating automated execution
+- **Session ID** pill (clickable to jump to that AI conversation)
+- **Summary** of what the agent accomplished
+- **Full response** viewable by clicking the entry
+
+**Keyboard navigation in History**:
+- `Up/Down Arrow` - Navigate entries
+- `Enter` - View full response
+- `Esc` - Close detail view and return to list
+
+### Read-Only Mode
+
+While automation is running, the AI operates in **read-only/plan mode**. You can still send messages to review progress, but the agent won't make changes. This prevents conflicts between manual interactions and automated tasks.
+
+The input area shows a **READ-ONLY** indicator with a warning-tinted background during automation.
+
+### Stopping the Runner
+
+Click the **Stop** button at any time. The runner will:
+- Complete the current task before stopping
+- Preserve all completed work
+- Allow you to resume later by clicking Run again
+
+### Parallel Batches
+
+You can run separate batch processes in different Maestro sessions simultaneously. Each session maintains its own independent batch state.
 
 ## Configuration
 

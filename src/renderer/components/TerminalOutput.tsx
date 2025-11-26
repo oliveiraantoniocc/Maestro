@@ -21,7 +21,7 @@ interface TerminalOutputProps {
   inputRef: React.RefObject<HTMLTextAreaElement>;
   logsEndRef: React.RefObject<HTMLDivElement>;
   maxOutputLines: number;
-  onDeleteLog?: (logId: string) => void;
+  onDeleteLog?: (logId: string) => number | null; // Returns the index to scroll to after deletion
 }
 
 export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((props, ref) => {
@@ -292,14 +292,16 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
     );
   }, [activeLogs, outputSearchQuery]);
 
-  // Auto-scroll to bottom when new logs are added (including user commands with no output)
+  // Auto-scroll to bottom when new logs are added (not when deleted)
   const prevLogCountRef = useRef(filteredLogs.length);
   useEffect(() => {
-    if (filteredLogs.length > prevLogCountRef.current) {
-      // New logs were added, scroll to bottom instantly
+    // Only scroll when new logs are added, not when deleted
+    if (filteredLogs.length > prevLogCountRef.current && filteredLogs.length > 0) {
+      // Scroll to bottom to show latest message
       virtuosoRef.current?.scrollToIndex({
         index: filteredLogs.length - 1,
-        align: 'end'
+        align: 'end',
+        behavior: 'auto'
       });
     }
     prevLogCountRef.current = filteredLogs.length;
@@ -419,8 +421,18 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
                   <span className="text-xs px-1" style={{ color: theme.colors.error }}>Delete?</span>
                   <button
                     onClick={() => {
-                      onDeleteLog(log.id);
+                      const nextIndex = onDeleteLog(log.id);
                       setDeleteConfirmLogId(null);
+                      // Scroll to the next user command after deletion
+                      if (nextIndex !== null && nextIndex >= 0) {
+                        setTimeout(() => {
+                          virtuosoRef.current?.scrollToIndex({
+                            index: nextIndex,
+                            align: 'start',
+                            behavior: 'auto'
+                          });
+                        }, 50);
+                      }
                     }}
                     className="px-2 py-0.5 rounded text-xs font-medium hover:opacity-80"
                     style={{ backgroundColor: theme.colors.error, color: '#fff' }}
@@ -755,7 +767,7 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
           Footer: () => session.state === 'busy' ? (
             <div className="flex items-center justify-center gap-2 text-xs opacity-50 animate-pulse py-4">
               <Activity className="w-4 h-4" />
-              {session.inputMode === 'ai' ? 'Claude is thinking...' : 'Executing shell command...'}
+              {session.statusMessage || (session.inputMode === 'ai' ? 'Claude is thinking...' : 'Executing shell command...')}
             </div>
           ) : <div ref={logsEndRef} />
         }}

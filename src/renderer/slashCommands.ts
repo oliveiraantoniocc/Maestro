@@ -2,7 +2,8 @@ export interface SlashCommand {
   command: string;
   description: string;
   terminalOnly?: boolean; // Only show this command in terminal mode
-  execute: (context: SlashCommandContext) => void;
+  aiOnly?: boolean; // Only show this command in AI mode
+  execute: (context: SlashCommandContext) => void | Promise<void>;
 }
 
 export interface SlashCommandContext {
@@ -16,28 +17,116 @@ export interface SlashCommandContext {
   setActiveFocus?: (focus: 'sidebar' | 'main' | 'right') => void;
   setSelectedFileIndex?: (index: number) => void;
   fileTreeRef?: React.RefObject<HTMLDivElement>;
+  // Optional properties for synopsis and new session
+  sendPromptToAgent?: (prompt: string) => Promise<{ success: boolean; response?: string; claudeSessionId?: string }>;
+  addHistoryEntry?: (entry: { type: 'AUTO' | 'USER'; summary: string; claudeSessionId?: string }) => void;
+  startNewClaudeSession?: () => void;
+  // Background synopsis - resumes old session without blocking
+  spawnBackgroundSynopsis?: (sessionId: string, cwd: string, resumeClaudeSessionId: string, prompt: string) => Promise<{ success: boolean; response?: string; claudeSessionId?: string }>;
 }
+
+// Synopsis prompt for getting a summary of recent work
+const SYNOPSIS_PROMPT = 'Synopsize our recent work in 2-3 sentences max.';
 
 export const slashCommands: SlashCommand[] = [
   {
+    command: '/synopsis',
+    description: 'Get a synopsis of recent work and add to history',
+    aiOnly: true,
+    execute: async (context: SlashCommandContext) => {
+      const { activeSessionId, sessions, sendPromptToAgent, addHistoryEntry } = context;
+
+      const actualActiveId = activeSessionId || (sessions.length > 0 ? sessions[0].id : '');
+      if (!actualActiveId) return;
+
+      const activeSession = sessions.find((s: any) => s.id === actualActiveId);
+      if (!activeSession) return;
+
+      // Request synopsis from agent
+      if (sendPromptToAgent) {
+        const result = await sendPromptToAgent(SYNOPSIS_PROMPT);
+        if (result.success && result.response && addHistoryEntry) {
+          addHistoryEntry({
+            type: 'USER',
+            summary: result.response,
+            claudeSessionId: result.claudeSessionId || activeSession.claudeSessionId
+          });
+        }
+      }
+    }
+  },
+  {
     command: '/clear',
-    description: 'Clear the output history',
-    execute: (context: SlashCommandContext) => {
-      const { activeSessionId, sessions, setSessions, currentMode } = context;
+    description: 'Clear output history and start new AI session',
+    execute: async (context: SlashCommandContext) => {
+      const { activeSessionId, sessions, setSessions, currentMode, spawnBackgroundSynopsis, addHistoryEntry, startNewClaudeSession } = context;
 
       // Use fallback to first session if activeSessionId is empty
       const actualActiveId = activeSessionId || (sessions.length > 0 ? sessions[0].id : '');
       if (!actualActiveId) return;
 
+      const activeSession = sessions.find((s: any) => s.id === actualActiveId);
       const targetLogKey = currentMode === 'ai' ? 'aiLogs' : 'shellLogs';
 
-      setSessions(prev => prev.map(s => {
-        if (s.id !== actualActiveId) return s;
-        return {
-          ...s,
-          [targetLogKey]: []
-        };
-      }));
+      // For AI mode: clear immediately, start new session, then synopsis old session in background
+      if (currentMode === 'ai' && activeSession?.claudeSessionId && spawnBackgroundSynopsis && addHistoryEntry) {
+        // Save old session info before clearing
+        const oldClaudeSessionId = activeSession.claudeSessionId;
+        const sessionCwd = activeSession.cwd;
+
+        // Step 1: Clear logs, start new session, show synopsizing status
+        // User can immediately start typing in the new session
+        setSessions(prev => prev.map(s => {
+          if (s.id !== actualActiveId) return s;
+          return {
+            ...s,
+            [targetLogKey]: [],
+            claudeSessionId: undefined, // Start fresh session
+            statusMessage: 'Agent is synopsizing...'
+          };
+        }));
+
+        // Step 2: Run synopsis in background on the OLD session (doesn't block user)
+        spawnBackgroundSynopsis(actualActiveId, sessionCwd, oldClaudeSessionId, SYNOPSIS_PROMPT)
+          .then(result => {
+            if (result.success && result.response) {
+              addHistoryEntry({
+                type: 'USER',
+                summary: result.response,
+                claudeSessionId: oldClaudeSessionId
+              });
+            }
+          })
+          .finally(() => {
+            // Clear status message when synopsis completes
+            setSessions(prev => prev.map(s => {
+              if (s.id !== actualActiveId) return s;
+              return {
+                ...s,
+                statusMessage: undefined
+              };
+            }));
+          });
+      } else if (currentMode === 'ai') {
+        // No existing session to synopsis, just clear and start fresh
+        setSessions(prev => prev.map(s => {
+          if (s.id !== actualActiveId) return s;
+          return {
+            ...s,
+            [targetLogKey]: [],
+            claudeSessionId: undefined
+          };
+        }));
+      } else {
+        // For terminal mode, just clear the logs
+        setSessions(prev => prev.map(s => {
+          if (s.id !== actualActiveId) return s;
+          return {
+            ...s,
+            [targetLogKey]: []
+          };
+        }));
+      }
     }
   },
   {

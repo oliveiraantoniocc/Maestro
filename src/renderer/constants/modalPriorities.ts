@@ -29,6 +29,9 @@ export const MODAL_PRIORITIES = {
   /** New instance creation modal */
   NEW_INSTANCE: 750,
 
+  /** Batch runner modal for scratchpad auto mode */
+  BATCH_RUNNER: 720,
+
   /** Quick actions command palette (Cmd+K) */
   QUICK_ACTION: 700,
 

@@ -438,15 +438,23 @@ export function SettingsModal(props: SettingsModalProps) {
       const allThemes = [...(groupedThemes['dark'] || []), ...(groupedThemes['light'] || [])];
       const currentIndex = allThemes.findIndex((t: Theme) => t.id === props.activeThemeId);
 
+      let newThemeId: string;
       if (e.shiftKey) {
         // Shift+Tab: go backwards
         const prevIndex = currentIndex === 0 ? allThemes.length - 1 : currentIndex - 1;
-        props.setActiveThemeId(allThemes[prevIndex].id);
+        newThemeId = allThemes[prevIndex].id;
       } else {
         // Tab: go forward
         const nextIndex = (currentIndex + 1) % allThemes.length;
-        props.setActiveThemeId(allThemes[nextIndex].id);
+        newThemeId = allThemes[nextIndex].id;
       }
+      props.setActiveThemeId(newThemeId);
+
+      // Scroll the newly selected theme button into view
+      setTimeout(() => {
+        const themeButton = themePickerRef.current?.querySelector(`[data-theme-id="${newThemeId}"]`);
+        themeButton?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 0);
     }
   };
 
@@ -468,18 +476,19 @@ export function SettingsModal(props: SettingsModalProps) {
             {groupedThemes[mode]?.map((t: Theme) => (
               <button
                 key={t.id}
+                data-theme-id={t.id}
                 onClick={() => props.setActiveThemeId(t.id)}
                 className={`p-3 rounded-lg border text-left transition-all ${props.activeThemeId === t.id ? 'ring-2' : ''}`}
                 style={{
                   borderColor: theme.colors.border,
                   backgroundColor: t.colors.bgSidebar,
-                  ringColor: theme.colors.accent
+                  ringColor: t.colors.accent
                 }}
                 tabIndex={-1}
               >
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-bold" style={{ color: t.colors.textMain }}>{t.name}</span>
-                  {props.activeThemeId === t.id && <Check className="w-4 h-4" style={{ color: theme.colors.accent }} />}
+                  {props.activeThemeId === t.id && <Check className="w-4 h-4" style={{ color: t.colors.accent }} />}
                 </div>
                 <div className="flex h-3 rounded overflow-hidden">
                   <div className="flex-1" style={{ backgroundColor: t.colors.bgMain }} />

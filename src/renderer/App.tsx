@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { NewInstanceModal } from './components/NewInstanceModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SessionList } from './components/SessionList';
@@ -16,8 +16,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MainPanel } from './components/MainPanel';
 import { ProcessMonitor } from './components/ProcessMonitor';
 import { GitDiffViewer } from './components/GitDiffViewer';
+import { BatchRunnerModal } from './components/BatchRunnerModal';
 
 // Import custom hooks
+import { useBatchProcessor } from './hooks/useBatchProcessor';
 import { useSettings } from './hooks';
 
 // Import contexts
@@ -136,6 +138,9 @@ export default function MaestroConsole() {
   // Agent Sessions Browser State (main panel view)
   const [agentSessionsOpen, setAgentSessionsOpen] = useState(false);
   const [activeClaudeSessionId, setActiveClaudeSessionId] = useState<string | null>(null);
+
+  // Batch Runner Modal State
+  const [batchRunnerModalOpen, setBatchRunnerModalOpen] = useState(false);
   const [renameGroupId, setRenameGroupId] = useState<string | null>(null);
   const [renameGroupValue, setRenameGroupValue] = useState('');
   const [renameGroupEmoji, setRenameGroupEmoji] = useState('📂');
@@ -636,6 +641,244 @@ export default function MaestroConsole() {
   const activeSession = sessions.find(s => s.id === activeSessionId) || sessions[0] || null;
   const theme = THEMES[activeThemeId];
   const anyTunnelActive = sessions.some(s => s.tunnelActive);
+
+  // --- BATCH PROCESSOR ---
+  // Helper to spawn a Claude agent and wait for completion (for a specific session)
+  const spawnAgentForSession = useCallback(async (sessionId: string, prompt: string): Promise<{ success: boolean; response?: string; claudeSessionId?: string }> => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) return { success: false };
+
+    // This spawns a new Claude session and waits for completion
+    try {
+      const agent = await window.maestro.agents.get('claude-code');
+      if (!agent) return { success: false };
+
+      // For batch processing, we always use a fresh session (no resume)
+      const targetSessionId = `${sessionId}-ai`;
+
+      // Set session to busy
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, state: 'busy' as SessionState } : s
+      ));
+
+      // Create a promise that resolves when the agent completes
+      return new Promise((resolve) => {
+        let claudeSessionId: string | undefined;
+        let responseText = '';
+
+        // Cleanup functions will be set when listeners are registered
+        let cleanupData: (() => void) | undefined;
+        let cleanupSessionId: (() => void) | undefined;
+        let cleanupExit: (() => void) | undefined;
+
+        const cleanup = () => {
+          cleanupData?.();
+          cleanupSessionId?.();
+          cleanupExit?.();
+        };
+
+        // Set up listeners for this specific agent run
+        cleanupData = window.maestro.process.onData((sid: string, data: string) => {
+          if (sid === targetSessionId) {
+            responseText += data;
+          }
+        });
+
+        cleanupSessionId = window.maestro.process.onSessionId((sid: string, capturedId: string) => {
+          if (sid === targetSessionId) {
+            claudeSessionId = capturedId;
+          }
+        });
+
+        cleanupExit = window.maestro.process.onExit((sid: string) => {
+          if (sid === targetSessionId) {
+            // Clean up listeners and resolve
+            cleanup();
+
+            setSessions(prev => prev.map(s =>
+              s.id === sessionId ? { ...s, state: 'idle' as SessionState, claudeSessionId } : s
+            ));
+
+            resolve({ success: true, response: responseText, claudeSessionId });
+          }
+        });
+
+        // Spawn the agent with permission-mode plan for batch processing
+        const commandToUse = agent.path || agent.command;
+        const spawnArgs = [...(agent.args || []), '--permission-mode', 'plan'];
+        window.maestro.process.spawn({
+          sessionId: targetSessionId,
+          toolType: 'claude-code',
+          cwd: session.cwd,
+          command: commandToUse,
+          args: spawnArgs,
+          prompt
+        }).catch(() => {
+          cleanup();
+          resolve({ success: false });
+        });
+      });
+    } catch (error) {
+      console.error('Error spawning agent:', error);
+      return { success: false };
+    }
+  }, [sessions]);
+
+  // Wrapper for slash commands that need to spawn an agent with just a prompt
+  const spawnAgentWithPrompt = useCallback(async (prompt: string) => {
+    if (!activeSession) return { success: false };
+    return spawnAgentForSession(activeSession.id, prompt);
+  }, [activeSession, spawnAgentForSession]);
+
+  // Background synopsis function - resumes an old Claude session without affecting main session state
+  const spawnBackgroundSynopsis = useCallback(async (
+    sessionId: string,
+    cwd: string,
+    resumeClaudeSessionId: string,
+    prompt: string
+  ): Promise<{ success: boolean; response?: string; claudeSessionId?: string }> => {
+    try {
+      const agent = await window.maestro.agents.get('claude-code');
+      if (!agent) return { success: false };
+
+      // Use a unique target ID for background synopsis
+      const targetSessionId = `${sessionId}-synopsis-${Date.now()}`;
+
+      return new Promise((resolve) => {
+        let claudeSessionId: string | undefined;
+        let responseText = '';
+
+        let cleanupData: (() => void) | undefined;
+        let cleanupSessionId: (() => void) | undefined;
+        let cleanupExit: (() => void) | undefined;
+
+        const cleanup = () => {
+          cleanupData?.();
+          cleanupSessionId?.();
+          cleanupExit?.();
+        };
+
+        cleanupData = window.maestro.process.onData((sid: string, data: string) => {
+          if (sid === targetSessionId) {
+            responseText += data;
+          }
+        });
+
+        cleanupSessionId = window.maestro.process.onSessionId((sid: string, capturedId: string) => {
+          if (sid === targetSessionId) {
+            claudeSessionId = capturedId;
+          }
+        });
+
+        cleanupExit = window.maestro.process.onExit((sid: string) => {
+          if (sid === targetSessionId) {
+            cleanup();
+            resolve({ success: true, response: responseText, claudeSessionId });
+          }
+        });
+
+        // Spawn with --resume to continue the old session
+        const commandToUse = agent.path || agent.command;
+        const spawnArgs = [...(agent.args || []), '--resume', resumeClaudeSessionId];
+        window.maestro.process.spawn({
+          sessionId: targetSessionId,
+          toolType: 'claude-code',
+          cwd,
+          command: commandToUse,
+          args: spawnArgs,
+          prompt
+        }).catch(() => {
+          cleanup();
+          resolve({ success: false });
+        });
+      });
+    } catch (error) {
+      console.error('Error spawning background synopsis:', error);
+      return { success: false };
+    }
+  }, []);
+
+  // Helper to add history entry
+  const addHistoryEntry = useCallback(async (entry: { type: 'AUTO' | 'USER'; summary: string; claudeSessionId?: string }) => {
+    if (!activeSession) return;
+
+    await window.maestro.history.add({
+      type: entry.type,
+      timestamp: Date.now(),
+      summary: entry.summary,
+      claudeSessionId: entry.claudeSessionId,
+      projectPath: activeSession.cwd
+    });
+  }, [activeSession]);
+
+  // Helper to start a new Claude session
+  const startNewClaudeSession = useCallback(() => {
+    if (!activeSession) return;
+
+    setSessions(prev => prev.map(s =>
+      s.id === activeSession.id ? { ...s, claudeSessionId: undefined, aiLogs: [], state: 'idle' as SessionState } : s
+    ));
+    setActiveClaudeSessionId(null);
+  }, [activeSession]);
+
+  // Initialize batch processor (supports parallel batches per session)
+  const {
+    batchRunStates,
+    getBatchState,
+    activeBatchSessionIds,
+    startBatchRun,
+    stopBatchRun,
+    customPrompts,
+    setCustomPrompt
+  } = useBatchProcessor({
+    sessions,
+    onUpdateSession: (sessionId, updates) => {
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, ...updates } : s
+      ));
+    },
+    onSpawnAgent: spawnAgentForSession,
+    onAddHistoryEntry: async (entry) => {
+      await window.maestro.history.add({
+        ...entry,
+        id: generateId()
+      });
+    }
+  });
+
+  // Get batch state for the active session
+  const activeBatchRunState = activeSession ? getBatchState(activeSession.id) : getBatchState('');
+
+  // Handler to open batch runner modal
+  const handleOpenBatchRunner = useCallback(() => {
+    setBatchRunnerModalOpen(true);
+  }, []);
+
+  // Handler to start batch run from modal
+  const handleStartBatchRun = useCallback((prompt: string) => {
+    if (!activeSession) return;
+    setBatchRunnerModalOpen(false);
+    startBatchRun(activeSession.id, activeSession.scratchPadContent, prompt);
+  }, [activeSession, startBatchRun]);
+
+  // Handler to stop batch run for active session (with confirmation)
+  const handleStopBatchRun = useCallback(() => {
+    if (!activeSession) return;
+    const sessionId = activeSession.id;
+    setConfirmModalMessage('Stop the batch run after the current task completes?');
+    setConfirmModalOnConfirm(() => () => stopBatchRun(sessionId));
+    setConfirmModalOpen(true);
+  }, [activeSession, stopBatchRun]);
+
+  // Handler to jump to a Claude session from history
+  const handleJumpToClaudeSession = useCallback((claudeSessionId: string) => {
+    // Set the Claude session ID and load its messages
+    if (activeSession) {
+      setActiveClaudeSessionId(claudeSessionId);
+      // Open the agent sessions browser to show the selected session
+      setAgentSessionsOpen(true);
+    }
+  }, [activeSession]);
 
   // Create sorted sessions array that matches visual display order (includes ALL sessions)
   const sortedSessions = useMemo(() => {
@@ -1243,7 +1486,8 @@ export default function MaestroConsole() {
         fileExplorerExpanded: [],
         fileExplorerScrollPos: 0,
         shellCwd: workingDir,
-        commandHistory: []
+        aiCommandHistory: [],
+        shellCommandHistory: []
       };
       setSessions(prev => [...prev, newSession]);
       setActiveSessionId(newId);
@@ -1399,7 +1643,12 @@ export default function MaestroConsole() {
           setRightPanelOpen,
           setActiveRightTab,
           setActiveFocus,
-          setSelectedFileIndex
+          setSelectedFileIndex,
+          // Batch processing and synopsis context
+          sendPromptToAgent: spawnAgentWithPrompt,
+          addHistoryEntry,
+          startNewClaudeSession,
+          spawnBackgroundSynopsis
         });
 
         setInputValue('');
@@ -1469,8 +1718,10 @@ export default function MaestroConsole() {
     setSessions(prev => prev.map(s => {
       if (s.id !== activeSessionId) return s;
 
-      // Add command to history (avoid duplicates of most recent command)
-      const newHistory = [...(s.commandHistory || [])];
+      // Add command to history (separate histories for AI and terminal modes)
+      const historyKey = currentMode === 'ai' ? 'aiCommandHistory' : 'shellCommandHistory';
+      const currentHistory = currentMode === 'ai' ? (s.aiCommandHistory || []) : (s.shellCommandHistory || []);
+      const newHistory = [...currentHistory];
       if (inputValue.trim() && (newHistory.length === 0 || newHistory[newHistory.length - 1] !== inputValue.trim())) {
         newHistory.push(inputValue.trim());
       }
@@ -1481,7 +1732,7 @@ export default function MaestroConsole() {
         state: 'busy',
         contextUsage: Math.min(s.contextUsage + 5, 100),
         shellCwd: newShellCwd,
-        commandHistory: newHistory
+        [historyKey]: newHistory
       };
     }));
 
@@ -1530,20 +1781,9 @@ export default function MaestroConsole() {
             spawnArgs.push('--resume', activeSession.claudeSessionId);
           }
 
-          // Add "establishing session" message for first interaction
-          if (isNewSession) {
-            setSessions(prev => prev.map(s => {
-              if (s.id !== activeSessionId) return s;
-              return {
-                ...s,
-                [targetLogKey]: [...s[targetLogKey], {
-                  id: generateId(),
-                  timestamp: Date.now(),
-                  source: 'system',
-                  text: '🔄 Establishing session with Claude...'
-                }]
-              };
-            }));
+          // Add read-only/plan mode when auto mode is active
+          if (activeBatchRunState.isRunning) {
+            spawnArgs.push('--permission-mode', 'plan');
           }
 
           // Spawn Claude with prompt as argument (use captured value)
@@ -1707,9 +1947,15 @@ export default function MaestroConsole() {
 
     // Handle slash command autocomplete
     if (slashCommandOpen) {
-      const filteredCommands = slashCommands.filter(cmd =>
-        cmd.command.toLowerCase().startsWith(inputValue.toLowerCase())
-      );
+      const isTerminalMode = activeSession.inputMode === 'terminal';
+      const filteredCommands = slashCommands.filter(cmd => {
+        // Check if command is only available in terminal mode
+        if (cmd.terminalOnly && !isTerminalMode) return false;
+        // Check if command is only available in AI mode
+        if (cmd.aiOnly && isTerminalMode) return false;
+        // Check if command matches input
+        return cmd.command.toLowerCase().startsWith(inputValue.toLowerCase());
+      });
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1719,10 +1965,35 @@ export default function MaestroConsole() {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedSlashCommandIndex(prev => Math.max(prev - 1, 0));
-      } else if (e.key === 'Tab' || (e.key === 'Enter' && filteredCommands.length > 0)) {
+      } else if (e.key === 'Tab') {
+        // Tab just fills in the command text
         e.preventDefault();
         setInputValue(filteredCommands[selectedSlashCommandIndex]?.command || inputValue);
         setSlashCommandOpen(false);
+      } else if (e.key === 'Enter' && filteredCommands.length > 0) {
+        // Enter executes the command directly
+        e.preventDefault();
+        const selectedCommand = filteredCommands[selectedSlashCommandIndex];
+        if (selectedCommand) {
+          setSlashCommandOpen(false);
+          setInputValue('');
+          if (inputRef.current) inputRef.current.style.height = 'auto';
+          // Execute the command directly
+          selectedCommand.execute({
+            activeSessionId,
+            sessions,
+            setSessions,
+            currentMode: activeSession.inputMode,
+            setRightPanelOpen,
+            setActiveRightTab,
+            setActiveFocus,
+            setSelectedFileIndex,
+            sendPromptToAgent: spawnAgentWithPrompt,
+            addHistoryEntry,
+            startNewClaudeSession,
+            spawnBackgroundSynopsis
+          });
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         setSlashCommandOpen(false);
@@ -1746,7 +2017,12 @@ export default function MaestroConsole() {
       inputRef.current?.blur();
       terminalOutputRef.current?.focus();
     } else if (e.key === 'ArrowUp') {
-      if ((activeSession.commandHistory || []).length > 0) {
+      // Use the appropriate history based on current mode
+      // Each mode has its own separate history - no cross-contamination
+      const currentHistory = activeSession.inputMode === 'ai'
+        ? (activeSession.aiCommandHistory || [])
+        : (activeSession.shellCommandHistory || []);
+      if (currentHistory.length > 0) {
         e.preventDefault();
         setCommandHistoryOpen(true);
         setCommandHistoryFilter(inputValue);
@@ -2272,6 +2548,7 @@ export default function MaestroConsole() {
           setGroups={setGroups}
           createNewGroup={createNewGroup}
           addNewSession={addNewSession}
+          activeBatchSessionIds={activeBatchSessionIds}
         />
       </ErrorBoundary>
 
@@ -2359,15 +2636,18 @@ export default function MaestroConsole() {
         handleDrop={handleDrop}
         getContextColor={getContextColor}
         setActiveSessionId={setActiveSessionId}
-        onDeleteLog={(logId: string) => {
-          if (!activeSession) return;
+        batchRunState={activeBatchRunState}
+        onStopBatchRun={handleStopBatchRun}
+        showConfirmation={showConfirmation}
+        onDeleteLog={(logId: string): number | null => {
+          if (!activeSession) return null;
 
           // Find the log entry and its index
           const logIndex = activeSession.shellLogs.findIndex(log => log.id === logId);
-          if (logIndex === -1) return;
+          if (logIndex === -1) return null;
 
           const log = activeSession.shellLogs[logIndex];
-          if (log.source !== 'user') return; // Only delete user commands
+          if (log.source !== 'user') return null; // Only delete user commands
 
           // Find the next user command index (or end of array)
           let endIndex = activeSession.shellLogs.length;
@@ -2384,17 +2664,38 @@ export default function MaestroConsole() {
             ...activeSession.shellLogs.slice(endIndex)
           ];
 
-          // Also remove from command history
+          // Find the index of the next user command in the NEW array
+          // This is the command that was at endIndex, now at logIndex position
+          let nextUserCommandIndex: number | null = null;
+          for (let i = logIndex; i < newLogs.length; i++) {
+            if (newLogs[i].source === 'user') {
+              nextUserCommandIndex = i;
+              break;
+            }
+          }
+          // If no next command, try to find the previous user command
+          if (nextUserCommandIndex === null) {
+            for (let i = logIndex - 1; i >= 0; i--) {
+              if (newLogs[i].source === 'user') {
+                nextUserCommandIndex = i;
+                break;
+              }
+            }
+          }
+
+          // Also remove from shell command history (this is for terminal mode)
           const commandText = log.text.trim();
-          const newCommandHistory = (activeSession.commandHistory || []).filter(
+          const newShellCommandHistory = (activeSession.shellCommandHistory || []).filter(
             cmd => cmd !== commandText
           );
 
           setSessions(sessions.map(s =>
             s.id === activeSession.id
-              ? { ...s, shellLogs: newLogs, commandHistory: newCommandHistory }
+              ? { ...s, shellLogs: newLogs, shellCommandHistory: newShellCommandHistory }
               : s
           ));
+
+          return nextUserCommandIndex;
         }}
       />
 
@@ -2430,8 +2731,28 @@ export default function MaestroConsole() {
           setSessions={setSessions}
           updateScratchPad={updateScratchPad}
           updateScratchPadState={updateScratchPadState}
+          batchRunState={activeBatchRunState}
+          onOpenBatchRunner={handleOpenBatchRunner}
+          onStopBatchRun={handleStopBatchRun}
+          onJumpToClaudeSession={handleJumpToClaudeSession}
         />
       </ErrorBoundary>
+
+      {/* --- BATCH RUNNER MODAL --- */}
+      {batchRunnerModalOpen && activeSession && (
+        <BatchRunnerModal
+          theme={theme}
+          onClose={() => setBatchRunnerModalOpen(false)}
+          onGo={(prompt) => {
+            // Save the custom prompt for this session
+            setCustomPrompt(activeSession.id, prompt);
+            // Start the batch run
+            handleStartBatchRun(prompt);
+          }}
+          initialPrompt={customPrompts[activeSession.id] || ''}
+          showConfirmation={showConfirmation}
+        />
+      )}
 
       {/* Old settings modal removed - using new SettingsModal component below */}
 

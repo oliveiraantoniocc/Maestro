@@ -191,6 +191,26 @@ contextBridge.exposeInMainWorld('maestro', {
     searchSessions: (projectPath: string, query: string, searchMode: 'title' | 'user' | 'assistant' | 'all') =>
       ipcRenderer.invoke('claude:searchSessions', projectPath, query, searchMode),
   },
+
+  // Temp file API (for batch processing)
+  tempfile: {
+    write: (content: string, filename?: string) =>
+      ipcRenderer.invoke('tempfile:write', content, filename),
+    read: (filePath: string) =>
+      ipcRenderer.invoke('tempfile:read', filePath),
+    delete: (filePath: string) =>
+      ipcRenderer.invoke('tempfile:delete', filePath),
+  },
+
+  // History API (per-project persistence)
+  history: {
+    getAll: (projectPath?: string) =>
+      ipcRenderer.invoke('history:getAll', projectPath),
+    add: (entry: { id: string; type: 'AUTO' | 'USER'; timestamp: number; summary: string; claudeSessionId?: string; projectPath: string }) =>
+      ipcRenderer.invoke('history:add', entry),
+    clear: (projectPath?: string) =>
+      ipcRenderer.invoke('history:clear', projectPath),
+  },
 });
 
 // Type definitions for TypeScript
@@ -309,6 +329,30 @@ export interface MaestroAPI {
       matchPreview: string;
       matchCount: number;
     }>>;
+  };
+  tempfile: {
+    write: (content: string, filename?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>;
+    delete: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  };
+  history: {
+    getAll: (projectPath?: string) => Promise<Array<{
+      id: string;
+      type: 'AUTO' | 'USER';
+      timestamp: number;
+      summary: string;
+      claudeSessionId?: string;
+      projectPath: string;
+    }>>;
+    add: (entry: {
+      id: string;
+      type: 'AUTO' | 'USER';
+      timestamp: number;
+      summary: string;
+      claudeSessionId?: string;
+      projectPath: string;
+    }) => Promise<boolean>;
+    clear: (projectPath?: string) => Promise<boolean>;
   };
 }
 
