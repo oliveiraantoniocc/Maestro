@@ -2,11 +2,12 @@
 // This mirrors src/renderer/constants/themes.ts for use in the main process
 // When themes are updated in the renderer, this file should also be updated
 
-import type { WebTheme } from './web-server';
+import type { Theme, ThemeId } from '../shared/theme-types';
 
-export type ThemeId = 'dracula' | 'monokai' | 'github-light' | 'solarized-light' | 'nord' | 'tokyo-night' | 'one-light' | 'gruvbox-light' | 'catppuccin-mocha' | 'gruvbox-dark' | 'catppuccin-latte' | 'ayu-light' | 'pedurple' | 'maestros-choice' | 'dre-synth' | 'inquest';
+// Re-export types from shared for convenience
+export type { Theme, ThemeId } from '../shared/theme-types';
 
-export const THEMES: Record<ThemeId, WebTheme> = {
+export const THEMES: Record<ThemeId, Theme> = {
   // Dark themes
   dracula: {
     id: 'dracula',
@@ -320,6 +321,6 @@ export const THEMES: Record<ThemeId, WebTheme> = {
  * Get a theme by its ID
  * Returns null if the theme ID is not found
  */
-export function getThemeById(themeId: string): WebTheme | null {
+export function getThemeById(themeId: string): Theme | null {
   return THEMES[themeId as ThemeId] || null;
 }

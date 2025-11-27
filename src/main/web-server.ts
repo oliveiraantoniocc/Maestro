@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { WebSocket } from 'ws';
 import crypto from 'crypto';
+import type { Theme } from '../shared/theme-types';
 
 // Types for web client messages
 interface WebClientMessage {
@@ -105,29 +106,11 @@ export type WriteToSessionCallback = (sessionId: string, data: string) => boolea
 // Returns true if successful, false if session not found or interrupt failed
 export type InterruptSessionCallback = (sessionId: string) => boolean;
 
-// Theme type for web clients (matches renderer/types/index.ts)
-export interface WebTheme {
-  id: string;
-  name: string;
-  mode: 'light' | 'dark' | 'vibe';
-  colors: {
-    bgMain: string;
-    bgSidebar: string;
-    bgActivity: string;
-    border: string;
-    textMain: string;
-    textDim: string;
-    accent: string;
-    accentDim: string;
-    accentText: string;
-    success: string;
-    warning: string;
-    error: string;
-  };
-}
+// Re-export Theme type from shared for backwards compatibility
+export type { Theme } from '../shared/theme-types';
 
 // Callback type for fetching current theme
-export type GetThemeCallback = () => WebTheme | null;
+export type GetThemeCallback = () => Theme | null;
 
 // Default rate limit configuration
 const DEFAULT_RATE_LIMIT_CONFIG: RateLimitConfig = {
@@ -1002,7 +985,7 @@ export class WebServer {
    * Broadcast theme change to all connected web clients
    * Called when the user changes the theme in the desktop app
    */
-  broadcastThemeChange(theme: WebTheme) {
+  broadcastThemeChange(theme: Theme) {
     this.broadcastToWebClients({
       type: 'theme',
       theme,
