@@ -41,6 +41,7 @@ import { generateId } from './utils/ids';
 import { getContextColor } from './utils/theme';
 import { fuzzyMatch } from './utils/search';
 import { shouldOpenExternally, loadFileTree, getAllFolderPaths, flattenTree } from './utils/fileExplorer';
+import { substituteTemplateVariables } from './utils/templateVariables';
 
 export default function MaestroConsole() {
   // --- LAYER STACK (for blocking shortcuts when modals are open) ---
@@ -2473,8 +2474,23 @@ export default function MaestroConsole() {
                 aiCommandHistory: Array.from(new Set([...(s.aiCommandHistory || []), selectedCommand.command])).slice(-50)
               };
             }));
-            // Send the custom command's prompt to the AI agent
-            spawnAgentWithPrompt(selectedCommand.prompt);
+            // Substitute template variables and send to the AI agent
+            (async () => {
+              let gitBranch: string | undefined;
+              if (activeSession.isGitRepo) {
+                try {
+                  const status = await gitService.getStatus(activeSession.cwd);
+                  gitBranch = status.branch;
+                } catch {
+                  // Ignore git errors
+                }
+              }
+              const substitutedPrompt = substituteTemplateVariables(
+                selectedCommand.prompt,
+                { session: activeSession, gitBranch }
+              );
+              spawnAgentWithPrompt(substitutedPrompt);
+            })();
           } else if ('execute' in selectedCommand && selectedCommand.execute) {
             // Execute the built-in command directly
             selectedCommand.execute({

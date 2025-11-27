@@ -59,7 +59,7 @@ export function AgentSessionsBrowser({
   const [sessions, setSessions] = useState<ClaudeSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('title');
+  const [searchMode, setSearchMode] = useState<SearchMode>('all');
   const [showAllSessions, setShowAllSessions] = useState(false);
   const [searchModeDropdownOpen, setSearchModeDropdownOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);

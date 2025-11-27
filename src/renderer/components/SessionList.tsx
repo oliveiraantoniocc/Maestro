@@ -2,11 +2,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Wand2, Plus, Settings, ChevronRight, ChevronDown, Activity, X, Keyboard,
   Globe, Network, PanelLeftClose, PanelLeftOpen, Folder, Info, FileText, GitBranch, Bot, Clock,
-  ScrollText, Cpu, Menu, Bookmark
+  ScrollText, Cpu, Menu, Bookmark, Tag
 } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut } from '../types';
 import { getStatusColor, getContextColor, formatActiveTime } from '../utils/theme';
 import { gitService } from '../services/git';
+
+// Default agent names - sessions with these names are considered "unnamed"
+const DEFAULT_AGENT_NAMES = [
+  'Claude Code',
+  'Aider (Gemini)',
+  'Qwen Coder',
+  'CLI Terminal',
+  'Terminal',
+];
+
+// Check if a session has a custom (user-defined) name
+const hasCustomName = (session: Session): boolean => {
+  return !DEFAULT_AGENT_NAMES.includes(session.name);
+};
 
 interface SessionListProps {
   // State
@@ -450,11 +464,18 @@ export function SessionList(props: SessionListProps) {
                             />
                           ) : (
                             <div
-                              className="text-sm font-medium truncate"
-                              style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                              className="flex items-center gap-1.5"
                               onDoubleClick={() => startRenamingSession(session.id)}
                             >
-                              {session.name}
+                              {hasCustomName(session) && (
+                                <Tag className="w-3 h-3 shrink-0" style={{ color: theme.colors.accent }} />
+                              )}
+                              <span
+                                className="text-sm font-medium truncate"
+                                style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                              >
+                                {session.name}
+                              </span>
                             </div>
                           )}
                           <div className="flex items-center gap-2 text-[10px] mt-0.5 opacity-70">
@@ -599,11 +620,18 @@ export function SessionList(props: SessionListProps) {
                               />
                             ) : (
                               <div
-                                className="text-sm font-medium truncate"
-                                style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                                className="flex items-center gap-1.5"
                                 onDoubleClick={() => startRenamingSession(session.id)}
                               >
-                                {session.name}
+                                {hasCustomName(session) && (
+                                  <Tag className="w-3 h-3 shrink-0" style={{ color: theme.colors.accent }} />
+                                )}
+                                <span
+                                  className="text-sm font-medium truncate"
+                                  style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                                >
+                                  {session.name}
+                                </span>
                               </div>
                             )}
                             <div className="flex items-center gap-2 text-[10px] mt-0.5 opacity-70">
@@ -753,11 +781,18 @@ export function SessionList(props: SessionListProps) {
                       />
                     ) : (
                       <div
-                        className="text-sm font-medium truncate"
-                        style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                        className="flex items-center gap-1.5"
                         onDoubleClick={() => startRenamingSession(session.id)}
                       >
-                        {session.name}
+                        {hasCustomName(session) && (
+                          <Tag className="w-3 h-3 shrink-0" style={{ color: theme.colors.accent }} />
+                        )}
+                        <span
+                          className="text-sm font-medium truncate"
+                          style={{ color: activeSessionId === session.id ? theme.colors.textMain : theme.colors.textDim }}
+                        >
+                          {session.name}
+                        </span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-[10px] mt-0.5 opacity-70">

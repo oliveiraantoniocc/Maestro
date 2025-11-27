@@ -188,28 +188,41 @@ export function GitLogViewer({ cwd, theme, onClose }: GitLogViewerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [filteredEntries.length, isSearchFocused, searchQuery]);
 
-  // Format date for display
+  // Format date for display - time for today, full date for older commits
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
       const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-      if (diffDays === 0) {
-        return 'Today';
-      } else if (diffDays === 1) {
-        return 'Yesterday';
-      } else if (diffDays < 7) {
-        return `${diffDays} days ago`;
-      } else if (diffDays < 30) {
-        const weeks = Math.floor(diffDays / 7);
-        return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-      } else if (diffDays < 365) {
-        const months = Math.floor(diffDays / 30);
-        return `${months} month${months > 1 ? 's' : ''} ago`;
+      // Check if same day
+      const isToday = date.toDateString() === now.toDateString();
+
+      // Check if yesterday
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const isYesterday = date.toDateString() === yesterday.toDateString();
+
+      if (isToday) {
+        // Show time for today (e.g., "2:30 PM")
+        return date.toLocaleTimeString(undefined, {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+      } else if (isYesterday) {
+        // Show "Yesterday" with time
+        return `Yesterday ${date.toLocaleTimeString(undefined, {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })}`;
       } else {
-        return date.toLocaleDateString();
+        // Show full date for older commits (e.g., "Nov 25, 2025")
+        return date.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
       }
     } catch {
       return dateStr;
@@ -301,22 +314,31 @@ export function GitLogViewer({ cwd, theme, onClose }: GitLogViewerProps) {
         <div
           className="px-6 py-3 border-b flex items-center gap-3"
           style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}
+          onClick={() => searchInputRef.current?.focus()}
         >
-          <Search className="w-4 h-4" style={{ color: theme.colors.textDim }} />
+          <Search className="w-4 h-4" style={{ color: isSearchFocused ? theme.colors.accent : theme.colors.textDim }} />
           <input
             ref={searchInputRef}
             type="text"
+            tabIndex={0}
             placeholder="Search commits by message, author, hash, or ref..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
-            className="flex-1 bg-transparent text-sm outline-none"
-            style={{ color: theme.colors.textMain }}
+            className="flex-1 bg-transparent text-sm outline-none border-none"
+            style={{
+              color: theme.colors.textMain,
+              caretColor: theme.colors.accent,
+            }}
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSearchQuery('');
+                searchInputRef.current?.focus();
+              }}
               className="p-1 rounded hover:bg-white/10"
               style={{ color: theme.colors.textDim }}
             >

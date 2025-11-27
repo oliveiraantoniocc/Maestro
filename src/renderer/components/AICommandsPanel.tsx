@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Terminal, Lock } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Terminal, Lock, ChevronDown, ChevronRight, Variable } from 'lucide-react';
 import type { Theme, CustomAICommand } from '../types';
+import { TEMPLATE_VARIABLES } from '../utils/templateVariables';
 
 interface AICommandsPanelProps {
   theme: Theme;
@@ -18,6 +19,7 @@ interface EditingCommand {
 export function AICommandsPanel({ theme, customAICommands, setCustomAICommands }: AICommandsPanelProps) {
   const [editingCommand, setEditingCommand] = useState<EditingCommand | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [variablesExpanded, setVariablesExpanded] = useState(false);
   const [newCommand, setNewCommand] = useState<EditingCommand>({
     id: '',
     command: '/',
@@ -96,6 +98,51 @@ export function AICommandsPanel({ theme, customAICommands, setCustomAICommands }
         <p className="text-xs opacity-50" style={{ color: theme.colors.textDim }}>
           Slash commands available in AI terminal mode. Built-in commands can be edited but not deleted.
         </p>
+      </div>
+
+      {/* Template Variables Documentation */}
+      <div
+        className="rounded-lg border overflow-hidden"
+        style={{ backgroundColor: theme.colors.bgMain, borderColor: theme.colors.border }}
+      >
+        <button
+          onClick={() => setVariablesExpanded(!variablesExpanded)}
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Variable className="w-3.5 h-3.5" style={{ color: theme.colors.accent }} />
+            <span className="text-xs font-bold uppercase" style={{ color: theme.colors.textDim }}>
+              Template Variables
+            </span>
+          </div>
+          {variablesExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+          )}
+        </button>
+        {variablesExpanded && (
+          <div className="px-3 pb-3 pt-1 border-t" style={{ borderColor: theme.colors.border }}>
+            <p className="text-[10px] mb-2" style={{ color: theme.colors.textDim }}>
+              Use these variables in your command prompts. They will be replaced with actual values at runtime.
+            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-h-48 overflow-y-auto scrollbar-thin">
+              {TEMPLATE_VARIABLES.map(({ variable, description }) => (
+                <div key={variable} className="flex items-center gap-2 py-0.5">
+                  <code
+                    className="text-[10px] font-mono px-1 py-0.5 rounded shrink-0"
+                    style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.accent }}
+                  >
+                    {variable}
+                  </code>
+                  <span className="text-[10px] truncate" style={{ color: theme.colors.textDim }}>
+                    {description}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {!isCreating && (

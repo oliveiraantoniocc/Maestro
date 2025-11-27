@@ -142,6 +142,31 @@ Maestro includes an extensible slash command system with autocomplete:
 
 Type `/` in the input area to open the autocomplete menu, use arrow keys to navigate, and press `Tab` or `Enter` to select.
 
+### Custom AI Commands
+
+Create your own slash commands in **Settings > Custom AI Commands**. Each command has a trigger (e.g., `/deploy`) and a prompt that gets sent to the AI agent.
+
+Commands support **template variables** that are automatically substituted at runtime:
+
+| Variable | Description |
+|----------|-------------|
+| `{{SESSION_NAME}}` | Current session name |
+| `{{CLAUDE_SESSION_ID}}` | Claude Code session ID (for conversation continuity) |
+| `{{PROJECT_NAME}}` | Project folder name |
+| `{{PROJECT_PATH}}` | Full path to project directory |
+| `{{GIT_BRANCH}}` | Current git branch (if in a git repo) |
+| `{{DATE}}` | Current date (YYYY-MM-DD) |
+| `{{TIME}}` | Current time (HH:MM:SS) |
+| `{{WEEKDAY}}` | Day of week (Monday, Tuesday, etc.) |
+
+**Example**: A custom `/standup` command with prompt:
+```
+It's {{WEEKDAY}}, {{DATE}}. I'm on branch {{GIT_BRANCH}} in {{PROJECT_NAME}}.
+Summarize what I worked on yesterday and suggest priorities for today.
+```
+
+See the full list of available variables in the **Template Variables** section within the Custom AI Commands panel.
+
 ## Automatic Runner
 
 The Automatic Runner lets you batch-process tasks using AI agents. Define your tasks as markdown checkboxes in the Scratchpad, and Maestro will work through them one by one, spawning a fresh AI session for each task.

@@ -63,6 +63,7 @@ src/
 | Add slash command | `src/renderer/slashCommands.ts` |
 | Add modal | Component + `src/renderer/constants/modalPriorities.ts` |
 | Add setting | `src/renderer/hooks/useSettings.ts`, `src/main/index.ts` |
+| Add template variable | `src/renderer/utils/templateVariables.ts` |
 
 ## Core Patterns
 

@@ -15,12 +15,24 @@ const DEFAULT_GLOBAL_STATS: GlobalStats = {
 };
 
 // Default AI commands that ship with Maestro
+// Template variables available: {{SESSION_ID}}, {{SESSION_NAME}}, {{CLAUDE_SESSION_ID}}, {{PROJECT_NAME}}, {{DATE}}, {{TIME}}, etc.
 const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
   {
     id: 'commit',
     command: '/commit',
     description: 'Commit outstanding changes and push up',
-    prompt: 'Examine the current git diff and determine if we need to make any updates to the README.md or CLAUDE.md files. Then make a sensible git commit message and push it all up to origin',
+    prompt: `Examine the current git diff and determine if we need to make any updates to the README.md or CLAUDE.md files.
+
+Then create a sensible git commit message. IMPORTANT: The commit message MUST include the Claude session ID "{{CLAUDE_SESSION_ID}}" somewhere in the commit body (not the subject line). This allows us to trace commits back to their original conversation for context and continuity.
+
+Example commit format:
+<subject line summarizing changes>
+
+<detailed description>
+
+Session: {{CLAUDE_SESSION_ID}}
+
+After committing, push all changes up to origin.`,
     isBuiltIn: true,
   },
 ];
