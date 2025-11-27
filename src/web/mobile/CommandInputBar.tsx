@@ -15,12 +15,14 @@
  * - Mode toggle button (AI / Terminal) with visual indicator
  * - Interrupt button (red X) visible when session is busy
  * - Recent command chips for quick access to recently sent commands
+ * - Slash command autocomplete popup when typing `/`
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { useSwipeUp } from '../hooks/useSwipeUp';
 import { RecentCommandChips } from './RecentCommandChips';
+import { SlashCommandAutocomplete, type SlashCommand, DEFAULT_SLASH_COMMANDS } from './SlashCommandAutocomplete';
 import type { CommandHistoryEntry } from '../hooks/useCommandHistory';
 
 /** Minimum touch target size per Apple HIG guidelines (44pt) */
@@ -73,6 +75,8 @@ export interface CommandInputBarProps {
   recentCommands?: CommandHistoryEntry[];
   /** Callback when a recent command chip is tapped */
   onSelectRecentCommand?: (command: string) => void;
+  /** Available slash commands (uses defaults if not provided) */
+  slashCommands?: SlashCommand[];
 }
 
 /**
@@ -96,6 +100,7 @@ export function CommandInputBar({
   onHistoryOpen,
   recentCommands,
   onSelectRecentCommand,
+  slashCommands = DEFAULT_SLASH_COMMANDS,
 }: CommandInputBarProps) {
   const colors = useThemeColors();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -117,6 +122,10 @@ export function CommandInputBar({
   // Internal state for uncontrolled mode
   const [internalValue, setInternalValue] = useState('');
   const value = controlledValue !== undefined ? controlledValue : internalValue;
+
+  // Slash command autocomplete state
+  const [slashCommandOpen, setSlashCommandOpen] = useState(false);
+  const [selectedSlashCommandIndex, setSelectedSlashCommandIndex] = useState(0);
 
   // Determine if input should be disabled
   const isDisabled = externalDisabled || isOffline || !isConnected;
@@ -195,6 +204,7 @@ export function CommandInputBar({
 
   /**
    * Handle textarea change
+   * Also detects slash commands and shows autocomplete
    */
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -203,9 +213,52 @@ export function CommandInputBar({
         setInternalValue(newValue);
       }
       onChange?.(newValue);
+
+      // Show slash command autocomplete when typing / at the start
+      // Only show if input starts with / and doesn't contain spaces (still typing command)
+      if (newValue.startsWith('/') && !newValue.includes(' ')) {
+        setSlashCommandOpen(true);
+        setSelectedSlashCommandIndex(0);
+      } else {
+        setSlashCommandOpen(false);
+      }
     },
     [controlledValue, onChange]
   );
+
+  /**
+   * Handle slash command selection from autocomplete
+   */
+  const handleSelectSlashCommand = useCallback(
+    (command: string) => {
+      if (controlledValue === undefined) {
+        setInternalValue(command);
+      }
+      onChange?.(command);
+      setSlashCommandOpen(false);
+
+      // Focus back on textarea
+      textareaRef.current?.focus();
+
+      // Auto-submit the slash command after a brief delay
+      setTimeout(() => {
+        onSubmit?.(command);
+        // Clear input after submit (for uncontrolled mode)
+        if (controlledValue === undefined) {
+          setInternalValue('');
+        }
+        onChange?.('');
+      }, 50);
+    },
+    [controlledValue, onChange, onSubmit]
+  );
+
+  /**
+   * Close slash command autocomplete
+   */
+  const handleCloseSlashCommand = useCallback(() => {
+    setSlashCommandOpen(false);
+  }, []);
 
   /**
    * Handle form submission
@@ -311,6 +364,18 @@ export function CommandInputBar({
           disabled={isDisabled}
         />
       )}
+
+      {/* Slash command autocomplete popup */}
+      <SlashCommandAutocomplete
+        isOpen={slashCommandOpen}
+        inputValue={value}
+        inputMode={inputMode}
+        commands={slashCommands}
+        onSelectCommand={handleSelectSlashCommand}
+        onClose={handleCloseSlashCommand}
+        selectedIndex={selectedSlashCommandIndex}
+        onSelectedIndexChange={setSelectedSlashCommandIndex}
+      />
 
       <form
         onSubmit={handleSubmit}
