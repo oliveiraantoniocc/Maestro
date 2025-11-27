@@ -3,10 +3,12 @@
  *
  * Provides theme context to web components. Accepts theme via props
  * (typically received from WebSocket connection to desktop app).
+ * Automatically injects CSS custom properties for theme colors.
  */
 
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import type { Theme, ThemeColors } from '../../shared/theme-types';
+import { injectCSSProperties, removeCSSProperties } from '../utils/cssCustomProperties';
 
 /**
  * Context value containing the current theme and utility functions
@@ -79,6 +81,16 @@ export function ThemeProvider({ theme = defaultTheme, children }: ThemeProviderP
     }),
     [theme]
   );
+
+  // Inject CSS custom properties whenever the theme changes
+  useEffect(() => {
+    injectCSSProperties(theme);
+
+    // Cleanup on unmount
+    return () => {
+      removeCSSProperties();
+    };
+  }, [theme]);
 
   return (
     <ThemeContext.Provider value={contextValue}>
