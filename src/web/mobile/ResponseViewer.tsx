@@ -5,6 +5,7 @@
  * Features:
  * - Full-screen overlay for immersive reading
  * - Displays the complete response text with proper formatting
+ * - Syntax highlighting for code blocks (task 1.33)
  * - Monospace font for code readability
  * - Swipe down to dismiss (task 1.35)
  * - Share/copy functionality (task 1.31)
@@ -14,8 +15,10 @@
  * in the SessionStatusBanner component.
  */
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useThemeColors } from '../components/ThemeProvider';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useThemeColors, useTheme } from '../components/ThemeProvider';
 import type { LastResponsePreview } from '../hooks/useSessions';
 import { triggerHaptic, HAPTIC_PATTERNS } from './index';
 
@@ -51,6 +54,143 @@ function formatTimestamp(timestamp: number): string {
 }
 
 /**
+ * Language mapping for common file extensions and language identifiers
+ */
+const LANGUAGE_MAP: Record<string, string> = {
+  'ts': 'typescript',
+  'tsx': 'tsx',
+  'js': 'javascript',
+  'jsx': 'jsx',
+  'json': 'json',
+  'md': 'markdown',
+  'py': 'python',
+  'python': 'python',
+  'rb': 'ruby',
+  'ruby': 'ruby',
+  'go': 'go',
+  'golang': 'go',
+  'rs': 'rust',
+  'rust': 'rust',
+  'java': 'java',
+  'c': 'c',
+  'cpp': 'cpp',
+  'c++': 'cpp',
+  'cs': 'csharp',
+  'csharp': 'csharp',
+  'php': 'php',
+  'html': 'html',
+  'css': 'css',
+  'scss': 'scss',
+  'sass': 'sass',
+  'sql': 'sql',
+  'sh': 'bash',
+  'bash': 'bash',
+  'shell': 'bash',
+  'zsh': 'bash',
+  'yaml': 'yaml',
+  'yml': 'yaml',
+  'toml': 'toml',
+  'xml': 'xml',
+  'swift': 'swift',
+  'kotlin': 'kotlin',
+  'kt': 'kotlin',
+  'scala': 'scala',
+  'r': 'r',
+  'lua': 'lua',
+  'perl': 'perl',
+  'dockerfile': 'dockerfile',
+  'docker': 'dockerfile',
+  'makefile': 'makefile',
+  'make': 'makefile',
+  'graphql': 'graphql',
+  'gql': 'graphql',
+  'diff': 'diff',
+  'patch': 'diff',
+};
+
+/**
+ * Normalize language identifier to a known language
+ */
+function normalizeLanguage(lang: string | undefined): string {
+  if (!lang) return 'text';
+  const normalized = lang.toLowerCase().trim();
+  return LANGUAGE_MAP[normalized] || normalized || 'text';
+}
+
+/**
+ * Represents a parsed segment of the response text
+ */
+interface TextSegment {
+  type: 'text' | 'code';
+  content: string;
+  language?: string;
+}
+
+/**
+ * Parse response text to identify code blocks
+ * Supports markdown-style triple backticks with optional language identifier
+ */
+function parseTextWithCodeBlocks(text: string): TextSegment[] {
+  const segments: TextSegment[] = [];
+
+  // Regex to match code blocks: ```language\ncode\n```
+  // Supports optional language identifier after opening backticks
+  const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
+
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    // Add text before the code block
+    if (match.index > lastIndex) {
+      const textContent = text.slice(lastIndex, match.index);
+      if (textContent.trim()) {
+        segments.push({
+          type: 'text',
+          content: textContent,
+        });
+      }
+    }
+
+    // Add the code block
+    const language = match[1] || '';
+    const code = match[2] || '';
+
+    // Only add non-empty code blocks
+    if (code.trim()) {
+      segments.push({
+        type: 'code',
+        content: code.trimEnd(), // Remove trailing whitespace but keep leading
+        language: normalizeLanguage(language),
+      });
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add any remaining text after the last code block
+  if (lastIndex < text.length) {
+    const remainingText = text.slice(lastIndex);
+    if (remainingText.trim()) {
+      segments.push({
+        type: 'text',
+        content: remainingText,
+      });
+    }
+  }
+
+  // If no code blocks were found, return the entire text as a single segment
+  if (segments.length === 0 && text.trim()) {
+    segments.push({
+      type: 'text',
+      content: text,
+    });
+  }
+
+  return segments;
+}
+
+/**
  * ResponseViewer component
  *
  * Renders a full-screen modal overlay for viewing complete AI responses.
@@ -65,10 +205,14 @@ export function ResponseViewer({
   sessionName,
 }: ResponseViewerProps) {
   const colors = useThemeColors();
+  const { isDark } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchDelta, setTouchDelta] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Select syntax highlighting style based on theme mode
+  const syntaxStyle = isDark ? vscDarkPlus : vs;
 
   // Threshold for swipe-to-dismiss (pixels)
   const DISMISS_THRESHOLD = 100;
@@ -138,6 +282,11 @@ export function ResponseViewer({
   // Display text - use full text if available, otherwise preview
   const displayText = fullText || response.text;
   const hasMoreContent = !fullText && response.fullLength > response.text.length;
+
+  // Parse the display text to extract code blocks for syntax highlighting
+  const parsedSegments = useMemo(() => {
+    return parseTextWithCodeBlocks(displayText);
+  }, [displayText]);
 
   // Calculate opacity based on swipe progress
   const backdropOpacity = Math.max(0, 1 - touchDelta / (DISMISS_THRESHOLD * 2));
@@ -294,18 +443,73 @@ export function ResponseViewer({
           </div>
         ) : (
           <>
-            {/* Response text */}
-            <div
-              style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                fontSize: '13px',
-                lineHeight: 1.6,
-                color: colors.textMain,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
-              {displayText}
+            {/* Response content with syntax-highlighted code blocks */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {parsedSegments.map((segment, index) => {
+                if (segment.type === 'code') {
+                  return (
+                    <div
+                      key={index}
+                      style={{
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        border: `1px solid ${colors.border}`,
+                      }}
+                    >
+                      {/* Language label */}
+                      {segment.language && segment.language !== 'text' && (
+                        <div
+                          style={{
+                            padding: '4px 12px',
+                            backgroundColor: colors.bgActivity,
+                            borderBottom: `1px solid ${colors.border}`,
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            color: colors.textDim,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                          }}
+                        >
+                          {segment.language}
+                        </div>
+                      )}
+                      <SyntaxHighlighter
+                        language={segment.language || 'text'}
+                        style={syntaxStyle}
+                        customStyle={{
+                          margin: 0,
+                          padding: '12px',
+                          fontSize: '12px',
+                          lineHeight: 1.5,
+                          backgroundColor: colors.bgActivity,
+                          borderRadius: 0,
+                        }}
+                        wrapLongLines={true}
+                        showLineNumbers={false}
+                      >
+                        {segment.content}
+                      </SyntaxHighlighter>
+                    </div>
+                  );
+                }
+
+                // Regular text segment
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+                      fontSize: '13px',
+                      lineHeight: 1.6,
+                      color: colors.textMain,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {segment.content}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Truncation notice */}
