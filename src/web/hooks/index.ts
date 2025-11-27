@@ -98,3 +98,14 @@ export type {
   UseUnreadBadgeOptions,
   UseUnreadBadgeReturn,
 } from './useUnreadBadge';
+
+export {
+  useSwipeGestures,
+  default as useSwipeGesturesDefault,
+} from './useSwipeGestures';
+
+export type {
+  SwipeDirection,
+  UseSwipeGesturesOptions,
+  UseSwipeGesturesReturn,
+} from './useSwipeGestures';

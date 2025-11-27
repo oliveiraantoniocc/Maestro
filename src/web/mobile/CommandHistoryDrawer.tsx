@@ -10,6 +10,7 @@
  * - Swipe down gesture to close
  * - Touch-friendly history items
  * - Quick-tap to reuse commands
+ * - Swipe left to reveal delete button (common mobile pattern)
  * - Long-press to delete individual commands
  * - Clear all history option
  */
@@ -17,6 +18,7 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { triggerHaptic, HAPTIC_PATTERNS, GESTURE_THRESHOLDS } from './index';
+import { useSwipeGestures } from '../hooks/useSwipeGestures';
 import type { CommandHistoryEntry } from '../hooks/useCommandHistory';
 
 /** Height of the drawer handle area */
@@ -73,6 +75,251 @@ function formatRelativeTime(timestamp: number): string {
 function truncateCommand(command: string, maxLength = 60): string {
   if (command.length <= maxLength) return command;
   return command.slice(0, maxLength - 3) + '...';
+}
+
+/** Width of the delete action button revealed on swipe */
+const DELETE_ACTION_WIDTH = 80;
+
+/** Threshold for triggering delete action on swipe */
+const DELETE_SWIPE_THRESHOLD = 60;
+
+/**
+ * Props for SwipeableHistoryItem component
+ */
+interface SwipeableHistoryItemProps {
+  entry: CommandHistoryEntry;
+  onSelect: (command: string) => void;
+  onDelete?: (id: string) => void;
+  isLongPressed: boolean;
+  onLongPressStart: (id: string) => void;
+  onLongPressEnd: () => void;
+}
+
+/**
+ * Individual swipeable history item with swipe-to-delete functionality
+ */
+function SwipeableHistoryItem({
+  entry,
+  onSelect,
+  onDelete,
+  isLongPressed,
+  onLongPressStart,
+  onLongPressEnd,
+}: SwipeableHistoryItemProps) {
+  const colors = useThemeColors();
+  const [showDeleteAction, setShowDeleteAction] = useState(false);
+
+  // Swipe gesture hook for swipe-to-delete
+  const {
+    handlers: swipeHandlers,
+    offsetX,
+    isSwiping,
+    resetOffset,
+  } = useSwipeGestures({
+    onSwipeLeft: onDelete ? () => {
+      // Show delete action on swipe left
+      triggerHaptic(HAPTIC_PATTERNS.tap);
+      setShowDeleteAction(true);
+    } : undefined,
+    onSwipeRight: () => {
+      // Hide delete action on swipe right
+      setShowDeleteAction(false);
+    },
+    trackOffset: true,
+    threshold: DELETE_SWIPE_THRESHOLD,
+    maxOffset: DELETE_ACTION_WIDTH + 20,
+    enabled: !!onDelete,
+  });
+
+  // Handle tap on the item
+  const handleTap = useCallback(() => {
+    if (showDeleteAction) {
+      // Tap to dismiss delete action
+      setShowDeleteAction(false);
+      resetOffset();
+    } else if (!isLongPressed) {
+      onSelect(entry.command);
+    }
+  }, [showDeleteAction, isLongPressed, entry.command, onSelect, resetOffset]);
+
+  // Handle delete button tap
+  const handleDeleteTap = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    triggerHaptic(HAPTIC_PATTERNS.success);
+    onDelete?.(entry.id);
+    setShowDeleteAction(false);
+    resetOffset();
+  }, [entry.id, onDelete, resetOffset]);
+
+  // Calculate transform based on swipe offset or delete action state
+  const translateX = showDeleteAction
+    ? -DELETE_ACTION_WIDTH
+    : Math.min(0, offsetX); // Only allow left swipe
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Delete action button (revealed on swipe left) */}
+      {onDelete && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 1, // Account for border
+            width: `${DELETE_ACTION_WIDTH}px`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#ef4444',
+            cursor: 'pointer',
+            opacity: showDeleteAction || offsetX < -20 ? 1 : 0,
+            transition: 'opacity 0.15s ease',
+          }}
+          onClick={handleDeleteTap}
+          aria-label="Delete command"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </div>
+      )}
+
+      {/* Swipeable item content */}
+      <div
+        {...swipeHandlers}
+        onClick={handleTap}
+        onTouchStart={(e) => {
+          swipeHandlers.onTouchStart(e);
+          onLongPressStart(entry.id);
+        }}
+        onTouchEnd={(e) => {
+          swipeHandlers.onTouchEnd(e);
+          onLongPressEnd();
+        }}
+        onTouchCancel={(e) => {
+          swipeHandlers.onTouchCancel(e);
+          onLongPressEnd();
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 16px',
+          cursor: 'pointer',
+          backgroundColor: isLongPressed
+            ? `${colors.accent}15`
+            : colors.bgSidebar,
+          transition: isSwiping ? 'none' : 'transform 0.3s ease, background-color 0.15s ease',
+          transform: `translateX(${translateX}px)`,
+          WebkitTapHighlightColor: 'transparent',
+          borderBottom: `1px solid ${colors.border}`,
+          touchAction: 'pan-y',
+        }}
+      >
+        {/* Mode indicator icon */}
+        <div
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '6px',
+            backgroundColor:
+              entry.mode === 'ai'
+                ? `${colors.accent}20`
+                : `${colors.textDim}20`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {entry.mode === 'ai' ? (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.accent}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 3v2M12 19v2M5.64 5.64l1.42 1.42M16.95 16.95l1.41 1.41M3 12h2M19 12h2M5.64 18.36l1.42-1.42M16.95 7.05l1.41-1.41" />
+              <circle cx="12" cy="12" r="4" />
+            </svg>
+          ) : (
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={colors.textDim}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="4 17 10 11 4 5" />
+              <line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+          )}
+        </div>
+
+        {/* Command text and timestamp */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '14px',
+              color: colors.textMain,
+              fontFamily: 'ui-monospace, monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {truncateCommand(entry.command)}
+          </p>
+          <p
+            style={{
+              margin: '2px 0 0',
+              fontSize: '11px',
+              color: colors.textDim,
+            }}
+          >
+            {formatRelativeTime(entry.timestamp)}
+          </p>
+        </div>
+
+        {/* Swipe hint indicator (chevron) */}
+        {onDelete && !showDeleteAction && (
+          <div
+            style={{
+              opacity: 0.3,
+              color: colors.textDim,
+              fontSize: '12px',
+            }}
+            aria-hidden="true"
+          >
+            ‹
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -422,140 +669,30 @@ export function CommandHistoryDrawer({
             </div>
           ) : (
             <div style={{ padding: '8px 0' }}>
-              {history.map((entry) => (
-                <div
-                  key={entry.id}
-                  onClick={() => {
-                    if (longPressId !== entry.id) {
-                      handleCommandTap(entry.command);
-                    }
-                  }}
-                  onTouchStart={() => handleLongPressStart(entry.id)}
-                  onTouchEnd={handleLongPressEnd}
-                  onTouchCancel={handleLongPressEnd}
+              {/* Swipe hint for first-time users */}
+              {history.length > 0 && onDeleteCommand && (
+                <p
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    backgroundColor:
-                      longPressId === entry.id
-                        ? `${colors.accent}15`
-                        : 'transparent',
-                    transition: 'background-color 0.15s ease',
-                    WebkitTapHighlightColor: 'transparent',
-                    borderBottom: `1px solid ${colors.border}`,
+                    fontSize: '11px',
+                    color: colors.textDim,
+                    textAlign: 'center',
+                    margin: '0 16px 8px',
+                    opacity: 0.7,
                   }}
                 >
-                  {/* Mode indicator icon */}
-                  <div
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      backgroundColor:
-                        entry.mode === 'ai'
-                          ? `${colors.accent}20`
-                          : `${colors.textDim}20`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {entry.mode === 'ai' ? (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={colors.accent}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M12 3v2M12 19v2M5.64 5.64l1.42 1.42M16.95 16.95l1.41 1.41M3 12h2M19 12h2M5.64 18.36l1.42-1.42M16.95 7.05l1.41-1.41" />
-                        <circle cx="12" cy="12" r="4" />
-                      </svg>
-                    ) : (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={colors.textDim}
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="4 17 10 11 4 5" />
-                        <line x1="12" y1="19" x2="20" y2="19" />
-                      </svg>
-                    )}
-                  </div>
-
-                  {/* Command text and timestamp */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: '14px',
-                        color: colors.textMain,
-                        fontFamily: 'ui-monospace, monospace',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}
-                    >
-                      {truncateCommand(entry.command)}
-                    </p>
-                    <p
-                      style={{
-                        margin: '2px 0 0',
-                        fontSize: '11px',
-                        color: colors.textDim,
-                      }}
-                    >
-                      {formatRelativeTime(entry.timestamp)}
-                    </p>
-                  </div>
-
-                  {/* Delete button (shown on long press) */}
-                  {longPressId === entry.id && onDeleteCommand && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(entry.id);
-                      }}
-                      style={{
-                        padding: '8px',
-                        borderRadius: '6px',
-                        backgroundColor: '#ef4444',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        WebkitTapHighlightColor: 'transparent',
-                      }}
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#ffffff"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                  Swipe left on an item to delete
+                </p>
+              )}
+              {history.map((entry) => (
+                <SwipeableHistoryItem
+                  key={entry.id}
+                  entry={entry}
+                  onSelect={handleCommandTap}
+                  onDelete={onDeleteCommand ? handleDelete : undefined}
+                  isLongPressed={longPressId === entry.id}
+                  onLongPressStart={handleLongPressStart}
+                  onLongPressEnd={handleLongPressEnd}
+                />
               ))}
             </div>
           )}
