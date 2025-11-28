@@ -1498,15 +1498,15 @@ export default function MaestroConsole() {
       }
 
       // Sidebar navigation with arrow keys (works when sidebar has focus)
-      if (activeFocus === 'sidebar' && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft')) {
+      if (activeFocus === 'sidebar' && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === ' ')) {
         e.preventDefault();
         if (sortedSessions.length === 0) return;
 
         // Get the currently selected session
         const currentSession = sortedSessions[selectedSidebarIndex];
 
-        // ArrowLeft: Close the current group and jump to nearest visible session
-        if (e.key === 'ArrowLeft' && currentSession?.groupId) {
+        // Space: Close the current group and jump to nearest visible session
+        if (e.key === ' ' && currentSession?.groupId) {
           const currentGroup = groups.find(g => g.id === currentSession.groupId);
           if (currentGroup && !currentGroup.collapsed) {
             // Collapse the group
