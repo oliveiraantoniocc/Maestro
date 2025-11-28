@@ -337,7 +337,8 @@ export function Scratchpad({
             onScroll={handlePreviewScroll}
             style={{
               borderColor: theme.colors.border,
-              color: theme.colors.textMain
+              color: theme.colors.textMain,
+              fontSize: '13px'
             }}
           >
             <style>{`
