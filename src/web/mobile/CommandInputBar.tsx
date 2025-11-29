@@ -14,11 +14,13 @@
  * - Minimum 44px touch targets per Apple HIG guidelines
  * - Mode toggle button (AI / Terminal) with visual indicator
  * - Voice input button for speech-to-text (uses Web Speech API)
- * - Interrupt button (red X) visible when session is busy
+ * - Interrupt button (red X) REPLACES send button when session is busy
+ *   (saves horizontal space - only one action button visible at a time)
  * - Recent command chips for quick access to recently sent commands
  * - Slash command autocomplete popup when typing `/`
  * - Haptic feedback on send (if device supports vibration)
  * - Quick actions menu on long-press of send button
+ * - Flex layout with minWidth: 0 ensures text input shrinks to fit screen
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -759,6 +761,9 @@ export function CommandInputBar({
           alignItems: 'flex-end', // Align to bottom for multi-line textarea
           paddingLeft: '16px',
           paddingRight: '16px',
+          // Ensure form doesn't overflow screen width
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
         {/* Mode toggle button - AI / Terminal */}
@@ -982,6 +987,8 @@ export function CommandInputBar({
           <div
             style={{
               flex: 1,
+              // minWidth: 0 is critical for flex items to shrink below content size
+              minWidth: 0,
               display: 'flex',
               alignItems: 'flex-start',
               borderRadius: '12px',
@@ -1067,6 +1074,8 @@ export function CommandInputBar({
           rows={1}
           style={{
             flex: 1,
+            // minWidth: 0 is critical for flex items to shrink below content size
+            minWidth: 0,
             // Large touch-friendly padding (minimum 12px, but larger for comfort)
             padding: '14px 18px',
             borderRadius: '12px',
@@ -1118,12 +1127,12 @@ export function CommandInputBar({
         />
         )}
 
-        {/* Interrupt button - visible when session is busy (red X) */}
-        {isSessionBusy && (
+        {/* Action button - shows either Interrupt (Red X) when busy, or Send button when idle */}
+        {/* When session is busy, the Red X replaces the Send button to save space on mobile */}
+        {isSessionBusy ? (
           <button
             type="button"
             onClick={handleInterrupt}
-            disabled={isDisabled}
             style={{
               padding: '14px',
               borderRadius: '12px',
@@ -1132,8 +1141,7 @@ export function CommandInputBar({
               fontSize: '14px',
               fontWeight: 500,
               border: 'none',
-              cursor: isDisabled ? 'default' : 'pointer',
-              opacity: isDisabled ? 0.5 : 1,
+              cursor: 'pointer',
               // Touch-friendly size - meets Apple HIG 44pt minimum
               width: `${MIN_TOUCH_TARGET + 4}px`,
               height: `${MIN_INPUT_HEIGHT}px`,
@@ -1149,16 +1157,14 @@ export function CommandInputBar({
             }}
             onTouchStart={(e) => {
               // Scale down slightly on touch for tactile feedback
-              if (!isDisabled) {
-                e.currentTarget.style.transform = 'scale(0.95)';
-                e.currentTarget.style.backgroundColor = '#dc2626'; // Darker red on press
-              }
+              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.backgroundColor = '#dc2626'; // Darker red on press
             }}
             onTouchEnd={(e) => {
               e.currentTarget.style.transform = 'scale(1)';
               e.currentTarget.style.backgroundColor = '#ef4444';
             }}
-            aria-label="Interrupt session"
+            aria-label="Cancel running command or AI query"
           >
             {/* X icon for interrupt - larger for touch */}
             <svg
@@ -1175,57 +1181,57 @@ export function CommandInputBar({
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-        )}
-
-        {/* Send button - large touch target matching input height */}
-        {/* Long-press shows quick actions menu */}
-        <button
-          ref={sendButtonRef}
-          type="submit"
-          disabled={isDisabled || !value.trim()}
-          style={{
-            padding: '14px',
-            borderRadius: '12px',
-            backgroundColor: colors.accent,
-            color: '#ffffff',
-            fontSize: '14px',
-            fontWeight: 500,
-            border: 'none',
-            cursor: isDisabled || !value.trim() ? 'default' : 'pointer',
-            opacity: isDisabled || !value.trim() ? 0.5 : 1,
-            // Touch-friendly size - meets Apple HIG 44pt minimum
-            width: `${MIN_TOUCH_TARGET + 4}px`,
-            height: `${MIN_INPUT_HEIGHT}px`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            // Smooth transitions
-            transition: 'opacity 150ms ease, background-color 150ms ease, transform 100ms ease',
-            // Prevent button from shrinking
-            flexShrink: 0,
-            // Active state feedback
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onTouchStart={handleSendButtonTouchStart}
-          onTouchEnd={handleSendButtonTouchEnd}
-          onTouchMove={handleSendButtonTouchMove}
-          aria-label="Send command (long press for quick actions)"
-        >
-          {/* Arrow up icon for send - larger for touch */}
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        ) : (
+          /* Send button - large touch target matching input height */
+          /* Long-press shows quick actions menu */
+          <button
+            ref={sendButtonRef}
+            type="submit"
+            disabled={isDisabled || !value.trim()}
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              backgroundColor: colors.accent,
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: 500,
+              border: 'none',
+              cursor: isDisabled || !value.trim() ? 'default' : 'pointer',
+              opacity: isDisabled || !value.trim() ? 0.5 : 1,
+              // Touch-friendly size - meets Apple HIG 44pt minimum
+              width: `${MIN_TOUCH_TARGET + 4}px`,
+              height: `${MIN_INPUT_HEIGHT}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              // Smooth transitions
+              transition: 'opacity 150ms ease, background-color 150ms ease, transform 100ms ease',
+              // Prevent button from shrinking
+              flexShrink: 0,
+              // Active state feedback
+              WebkitTapHighlightColor: 'transparent',
+            }}
+            onTouchStart={handleSendButtonTouchStart}
+            onTouchEnd={handleSendButtonTouchEnd}
+            onTouchMove={handleSendButtonTouchMove}
+            aria-label="Send command (long press for quick actions)"
           >
-            <line x1="12" y1="19" x2="12" y2="5" />
-            <polyline points="5 12 12 5 19 12" />
-          </svg>
-        </button>
+            {/* Arrow up icon for send - larger for touch */}
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <polyline points="5 12 12 5 19 12" />
+            </svg>
+          </button>
+        )}
       </form>
 
       {/* Current working directory display - shown in terminal mode */}
