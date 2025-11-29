@@ -639,6 +639,7 @@ export function FilePreview({ file, onClose, theme, markdownRawMode, setMarkdown
               .prose p { color: ${theme.colors.textMain}; margin: 0.5em 0; }
               .prose ul, .prose ol { color: ${theme.colors.textMain}; margin: 0.5em 0; padding-left: 1.5em; }
               .prose li { margin: 0.25em 0; }
+              .prose li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.5em; }
               .prose code { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
               .prose pre { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 1em; border-radius: 6px; overflow-x: auto; }
               .prose pre code { background: none; padding: 0; }

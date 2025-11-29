@@ -710,13 +710,13 @@ export function SessionList(props: SessionListProps) {
               ) : (
                 /* Collapsed Bookmarks Palette */
                 <div
-                  className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 opacity-50 hover:opacity-100 cursor-pointer transition-opacity"
+                  className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
                   onClick={() => setBookmarksCollapsed(false)}
                 >
                   {[...filteredSessions.filter(s => s.bookmarked)].sort((a, b) => compareSessionNames(a.name, b.name)).map(s => (
                     <div
                       key={s.id}
-                      className="group/indicator relative flex-1 rounded-full"
+                      className="group/indicator relative flex-1 rounded-full opacity-50 hover:opacity-100 transition-opacity"
                       style={
                         s.toolType === 'claude' && !s.claudeSessionId
                           ? { border: `1px solid ${theme.colors.textDim}`, backgroundColor: 'transparent' }
@@ -983,13 +983,13 @@ export function SessionList(props: SessionListProps) {
                 ) : (
                   /* Collapsed Group Palette */
                   <div
-                    className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 opacity-50 hover:opacity-100 cursor-pointer transition-opacity"
+                    className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
                     onClick={() => toggleGroup(group.id)}
                   >
                     {groupSessions.map(s => (
                       <div
                         key={s.id}
-                        className="group/indicator relative flex-1 rounded-full"
+                        className="group/indicator relative flex-1 rounded-full opacity-50 hover:opacity-100 transition-opacity"
                         style={
                           s.toolType === 'claude' && !s.claudeSessionId
                             ? { border: `1px solid ${theme.colors.textDim}`, backgroundColor: 'transparent' }

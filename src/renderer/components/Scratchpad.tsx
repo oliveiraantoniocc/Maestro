@@ -1078,6 +1078,7 @@ export function Scratchpad({
               .prose ol { list-style-type: decimal; }
               .prose li { margin: 0.25em 0; display: list-item; }
               .prose li::marker { color: ${theme.colors.textMain}; }
+              .prose li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.5em; }
               .prose code { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.9em; }
               .prose pre { background-color: ${theme.colors.bgActivity}; color: ${theme.colors.textMain}; padding: 1em; border-radius: 6px; overflow-x: auto; }
               .prose pre code { background: none; padding: 0; }
