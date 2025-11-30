@@ -569,11 +569,21 @@ export function AgentSessionsBrowser({
     onClose();
   }, [starredSessions, onResumeSession, onClose]);
 
-  // Format file size
+  // Format file size with proper KB/MB/GB/TB scaling
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+    return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
+  };
+
+  // Format large numbers with k/M/B suffixes
+  const formatNumber = (num: number): string => {
+    if (num < 1000) return num.toFixed(1);
+    if (num < 1000000) return `${(num / 1000).toFixed(1)}k`;
+    if (num < 1000000000) return `${(num / 1000000).toFixed(1)}M`;
+    return `${(num / 1000000000).toFixed(1)}B`;
   };
 
   // Format relative time
@@ -679,11 +689,12 @@ export function AgentSessionsBrowser({
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
+                    {/* Show full UUID as primary when no custom name */}
                     <span
-                      className="text-sm font-medium truncate max-w-md"
+                      className="text-sm font-mono font-medium truncate max-w-md"
                       style={{ color: theme.colors.textMain }}
                     >
-                      {viewingSession.firstMessage || `Session ${viewingSession.sessionId.slice(0, 8)}...`}
+                      {viewingSession.sessionId.toUpperCase()}
                     </span>
                     <button
                       onClick={(e) => {
@@ -699,14 +710,28 @@ export function AgentSessionsBrowser({
                     </button>
                   </div>
                 )}
-                {/* First message shown as subtitle if session has a name */}
+                {/* Show UUID underneath the custom name */}
                 {viewingSession.sessionName && (
-                  <div className="text-xs truncate max-w-md" style={{ color: theme.colors.textDim }}>
-                    {viewingSession.firstMessage || `Session ${viewingSession.sessionId.slice(0, 8)}...`}
+                  <div className="text-xs font-mono truncate max-w-md" style={{ color: theme.colors.textDim }}>
+                    {viewingSession.sessionId.toUpperCase()}
                   </div>
                 )}
-                <div className="text-xs" style={{ color: theme.colors.textDim }}>
-                  {totalMessages} messages • {formatRelativeTime(viewingSession.modifiedAt)}
+                {/* Stats row with relative time and started timestamp */}
+                <div className="text-xs flex items-center gap-1" style={{ color: theme.colors.textDim }}>
+                  <span>{totalMessages} messages</span>
+                  <span>•</span>
+                  <span
+                    className="relative group cursor-default"
+                    title={new Date(viewingSession.timestamp).toLocaleString()}
+                  >
+                    {formatRelativeTime(viewingSession.modifiedAt)}
+                    <span
+                      className="absolute left-0 top-0 opacity-0 group-hover:opacity-100 transition-opacity px-1 rounded whitespace-nowrap"
+                      style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textMain }}
+                    >
+                      {new Date(viewingSession.timestamp).toLocaleString()}
+                    </span>
+                  </span>
                 </div>
               </div>
             </>
@@ -782,7 +807,7 @@ export function AgentSessionsBrowser({
                   </span>
                 </div>
                 <span className="text-lg font-mono font-semibold" style={{ color: theme.colors.success }}>
-                  ${viewingSession.costUsd.toFixed(4)}
+                  ${viewingSession.costUsd.toFixed(2)}
                 </span>
               </div>
 
@@ -812,7 +837,7 @@ export function AgentSessionsBrowser({
                   </span>
                 </div>
                 <span className="text-lg font-mono font-semibold" style={{ color: theme.colors.textMain }}>
-                  {((viewingSession.inputTokens + viewingSession.outputTokens) / 1000).toFixed(1)}k
+                  {formatNumber(viewingSession.inputTokens + viewingSession.outputTokens)}
                 </span>
                 <span className="text-[10px]" style={{ color: theme.colors.textDim }}>
                   {((viewingSession.inputTokens + viewingSession.outputTokens) / 200000 * 100).toFixed(1)}% of 200k context
@@ -838,20 +863,20 @@ export function AgentSessionsBrowser({
               <div className="flex items-center gap-2">
                 <ArrowDownToLine className="w-3 h-3" style={{ color: theme.colors.textDim }} />
                 <span className="text-xs" style={{ color: theme.colors.textDim }}>
-                  Input: <span className="font-mono font-medium" style={{ color: theme.colors.textMain }}>{(viewingSession.inputTokens / 1000).toFixed(1)}k</span>
+                  Input: <span className="font-mono font-medium" style={{ color: theme.colors.textMain }}>{formatNumber(viewingSession.inputTokens)}</span>
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <ArrowUpFromLine className="w-3 h-3" style={{ color: theme.colors.textDim }} />
                 <span className="text-xs" style={{ color: theme.colors.textDim }}>
-                  Output: <span className="font-mono font-medium" style={{ color: theme.colors.textMain }}>{(viewingSession.outputTokens / 1000).toFixed(1)}k</span>
+                  Output: <span className="font-mono font-medium" style={{ color: theme.colors.textMain }}>{formatNumber(viewingSession.outputTokens)}</span>
                 </span>
               </div>
               {viewingSession.cacheReadTokens > 0 && (
                 <div className="flex items-center gap-2">
                   <Database className="w-3 h-3" style={{ color: theme.colors.success }} />
                   <span className="text-xs" style={{ color: theme.colors.textDim }}>
-                    Cache Read: <span className="font-mono font-medium" style={{ color: theme.colors.success }}>{(viewingSession.cacheReadTokens / 1000).toFixed(1)}k</span>
+                    Cache Read: <span className="font-mono font-medium" style={{ color: theme.colors.success }}>{formatNumber(viewingSession.cacheReadTokens)}</span>
                   </span>
                 </div>
               )}
@@ -859,7 +884,7 @@ export function AgentSessionsBrowser({
                 <div className="flex items-center gap-2">
                   <Hash className="w-3 h-3" style={{ color: theme.colors.warning }} />
                   <span className="text-xs" style={{ color: theme.colors.textDim }}>
-                    Cache Write: <span className="font-mono font-medium" style={{ color: theme.colors.warning }}>{(viewingSession.cacheCreationTokens / 1000).toFixed(1)}k</span>
+                    Cache Write: <span className="font-mono font-medium" style={{ color: theme.colors.warning }}>{formatNumber(viewingSession.cacheCreationTokens)}</span>
                   </span>
                 </div>
               )}
@@ -867,12 +892,6 @@ export function AgentSessionsBrowser({
                 <HardDrive className="w-3 h-3" style={{ color: theme.colors.textDim }} />
                 <span className="text-xs" style={{ color: theme.colors.textDim }}>
                   Size: <span className="font-mono font-medium" style={{ color: theme.colors.textMain }}>{formatSize(viewingSession.sizeBytes)}</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-3 h-3" style={{ color: theme.colors.textDim }} />
-                <span className="text-xs" style={{ color: theme.colors.textDim }}>
-                  Started: <span className="font-medium" style={{ color: theme.colors.textMain }}>{new Date(viewingSession.timestamp).toLocaleString()}</span>
                 </span>
               </div>
             </div>
