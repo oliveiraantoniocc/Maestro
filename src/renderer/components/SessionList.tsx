@@ -311,7 +311,6 @@ export function SessionList(props: SessionListProps) {
   const [preFilterGroupStates, setPreFilterGroupStates] = useState<Map<string, boolean>>(new Map());
   const [menuOpen, setMenuOpen] = useState(false);
   const [liveOverlayOpen, setLiveOverlayOpen] = useState(false);
-  const [urlCopied, setUrlCopied] = useState(false);
 
   // Cloudflared installation status (cached after first check)
   const [cloudflaredInstalled, setCloudflaredInstalled] = useState<boolean | null>(null);
@@ -330,13 +329,11 @@ export function SessionList(props: SessionListProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const liveOverlayRef = useRef<HTMLDivElement>(null);
 
-  // Copy URL to clipboard
-  const copyUrlToClipboard = () => {
-    if (webInterfaceUrl) {
-      navigator.clipboard.writeText(webInterfaceUrl);
-      setUrlCopied(true);
-      setTimeout(() => setUrlCopied(false), 2000);
-    }
+  // Copy URL to clipboard (supports both local and remote URLs)
+  const copyToClipboard = async (url: string, type: 'local' | 'remote') => {
+    await navigator.clipboard.writeText(url);
+    setCopiedUrl(type);
+    setTimeout(() => setCopiedUrl(null), 2000);
   };
 
   // Close live overlay when clicking outside
@@ -695,7 +692,7 @@ export function SessionList(props: SessionListProps) {
 
                 {/* LIVE Overlay with URL and QR Code */}
                 {isLiveMode && liveOverlayOpen && webInterfaceUrl && (
-                  <div className="absolute top-full left-0 pt-2 z-50" style={{ width: '240px' }}>
+                  <div className="absolute top-full left-0 pt-2 z-50" style={{ width: '280px' }}>
                     <div
                       className="rounded-lg shadow-2xl overflow-hidden"
                       style={{
@@ -703,12 +700,82 @@ export function SessionList(props: SessionListProps) {
                         border: `1px solid ${theme.colors.border}`
                       }}
                     >
-                      {/* URL Section */}
-                      <div className="p-3">
-                        <div className="text-[10px] uppercase font-bold mb-2" style={{ color: theme.colors.textDim }}>
-                          Web Interface URL
+                      {/* Remote Access Toggle Section */}
+                      <div className="p-3 border-b" style={{ borderColor: theme.colors.border }}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] uppercase font-bold" style={{ color: theme.colors.textDim }}>
+                              Remote Access
+                            </div>
+                            {cloudflaredInstalled === false && (
+                              <div className="text-[9px] text-yellow-500 mt-1">
+                                Install cloudflared to enable
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Toggle Switch */}
+                          <button
+                            onClick={handleTunnelToggle}
+                            disabled={!cloudflaredInstalled || tunnelStatus === 'starting'}
+                            className={`relative w-10 h-5 rounded-full transition-colors ${
+                              tunnelStatus === 'connected'
+                                ? 'bg-green-500'
+                                : cloudflaredInstalled
+                                  ? 'bg-gray-600 hover:bg-gray-500'
+                                  : 'bg-gray-700 opacity-50 cursor-not-allowed'
+                            }`}
+                            title={
+                              !cloudflaredInstalled
+                                ? 'cloudflared not installed'
+                                : tunnelStatus === 'connected'
+                                  ? 'Disable remote access'
+                                  : 'Enable remote access'
+                            }
+                          >
+                            <div
+                              className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                                tunnelStatus === 'connected' ? 'translate-x-5' : 'translate-x-0.5'
+                              }`}
+                            />
+                            {tunnelStatus === 'starting' && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              </div>
+                            )}
+                          </button>
                         </div>
-                        <div className="flex items-center gap-2 mb-3">
+
+                        {/* Error Message */}
+                        {tunnelStatus === 'error' && tunnelError && (
+                          <div className="mt-2 text-[10px] text-red-400">
+                            {tunnelError}
+                          </div>
+                        )}
+
+                        {/* Install Instructions (when cloudflared not found) */}
+                        {cloudflaredInstalled === false && (
+                          <div className="mt-2 p-2 rounded text-[10px]" style={{ backgroundColor: theme.colors.bgActivity }}>
+                            <div className="font-medium mb-1">To enable remote access:</div>
+                            <div className="opacity-70 font-mono">
+                              brew install cloudflared
+                            </div>
+                            <button
+                              onClick={() => window.maestro.shell.openExternal('https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/')}
+                              className="text-blue-400 hover:underline mt-1 block"
+                            >
+                              Other platforms →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* LOCAL URL Section */}
+                      <div className="p-3 border-b" style={{ borderColor: theme.colors.border }}>
+                        <div className="text-[10px] uppercase font-bold mb-2" style={{ color: theme.colors.textDim }}>
+                          Local
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
                           <div
                             className="flex-1 text-[11px] font-mono text-green-400 truncate select-all"
                             title={webInterfaceUrl}
@@ -716,41 +783,28 @@ export function SessionList(props: SessionListProps) {
                             {webInterfaceUrl.replace(/^https?:\/\//, '')}
                           </div>
                           <button
-                            onClick={copyUrlToClipboard}
+                            onClick={() => copyToClipboard(webInterfaceUrl, 'local')}
                             className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
-                            title={urlCopied ? "Copied!" : "Copy URL"}
+                            title="Copy URL"
                           >
-                            {urlCopied ? (
+                            {copiedUrl === 'local' ? (
                               <span className="text-green-500 text-[10px] font-bold">✓</span>
                             ) : (
                               <Copy className="w-3 h-3" style={{ color: theme.colors.textDim }} />
                             )}
                           </button>
+                          <button
+                            onClick={() => window.maestro.shell.openExternal(webInterfaceUrl)}
+                            className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
+                            title="Open in Browser"
+                          >
+                            <ExternalLink className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+                          </button>
                         </div>
-
-                        {/* Open in Browser Button */}
-                        <button
-                          onClick={() => window.maestro.shell.openExternal(webInterfaceUrl)}
-                          className="w-full py-2 rounded text-xs font-medium transition-colors hover:opacity-90 flex items-center justify-center gap-2"
-                          style={{
-                            backgroundColor: theme.colors.accent,
-                            color: theme.colors.accentForeground
-                          }}
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                          Open in Browser
-                        </button>
-                      </div>
-
-                      {/* QR Code Section */}
-                      <div className="px-3 pb-3 pt-2 border-t flex flex-col items-center" style={{ borderColor: theme.colors.border }}>
-                        <div className="text-[10px] uppercase font-bold mb-2" style={{ color: theme.colors.textDim }}>
-                          Scan with Mobile
-                        </div>
-                        <div className="p-3 rounded w-full" style={{ backgroundColor: 'white' }}>
+                        <div className="p-2 rounded" style={{ backgroundColor: 'white' }}>
                           <QRCodeSVG
                             value={webInterfaceUrl}
-                            size={240}
+                            size={180}
                             bgColor="#FFFFFF"
                             fgColor="#000000"
                             style={{ width: '100%', height: 'auto' }}
@@ -758,8 +812,67 @@ export function SessionList(props: SessionListProps) {
                         </div>
                       </div>
 
+                      {/* REMOTE URL Section */}
+                      <div className="p-3 border-b" style={{ borderColor: theme.colors.border }}>
+                        <div className="text-[10px] uppercase font-bold mb-2" style={{ color: theme.colors.textDim }}>
+                          Remote
+                        </div>
+
+                        {tunnelStatus === 'connected' && tunnelUrl ? (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div
+                                className="flex-1 text-[11px] font-mono text-blue-400 truncate select-all"
+                                title={tunnelUrl}
+                              >
+                                {tunnelUrl.replace(/^https?:\/\//, '')}
+                              </div>
+                              <button
+                                onClick={() => copyToClipboard(tunnelUrl, 'remote')}
+                                className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
+                                title="Copy URL"
+                              >
+                                {copiedUrl === 'remote' ? (
+                                  <span className="text-green-500 text-[10px] font-bold">✓</span>
+                                ) : (
+                                  <Copy className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => window.maestro.shell.openExternal(tunnelUrl)}
+                                className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
+                                title="Open in Browser"
+                              >
+                                <ExternalLink className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+                              </button>
+                            </div>
+                            <div className="p-2 rounded" style={{ backgroundColor: 'white' }}>
+                              <QRCodeSVG
+                                value={tunnelUrl}
+                                size={180}
+                                bgColor="#FFFFFF"
+                                fgColor="#000000"
+                                style={{ width: '100%', height: 'auto' }}
+                              />
+                            </div>
+                          </>
+                        ) : tunnelStatus === 'starting' ? (
+                          <div className="text-[11px] text-center py-8" style={{ color: theme.colors.textDim }}>
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                            Starting tunnel...
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-center py-8" style={{ color: theme.colors.textDim }}>
+                            {cloudflaredInstalled === false
+                              ? 'Install cloudflared to enable'
+                              : 'Enable toggle above for remote access'
+                            }
+                          </div>
+                        )}
+                      </div>
+
                       {/* Turn Off Button */}
-                      <div className="px-3 pb-3">
+                      <div className="p-3">
                         <button
                           onClick={() => {
                             toggleGlobalLive();
