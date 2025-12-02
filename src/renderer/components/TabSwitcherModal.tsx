@@ -23,6 +23,7 @@ interface TabSwitcherModalProps {
   theme: Theme;
   tabs: AITab[];
   activeTabId: string;
+  cwd: string; // Current working directory for syncing tab names
   shortcut?: Shortcut;
   onTabSelect: (tabId: string) => void;
   onNamedSessionSelect: (claudeSessionId: string, projectPath: string, sessionName: string) => void;
@@ -140,6 +141,7 @@ export function TabSwitcherModal({
   theme,
   tabs,
   activeTabId,
+  cwd,
   shortcut,
   onTabSelect,
   onNamedSessionSelect,
@@ -192,15 +194,28 @@ export function TabSwitcherModal({
     return () => clearTimeout(timer);
   }, []);
 
-  // Load named sessions when switching to "all-named" mode (or preload on mount)
+  // On mount: sync any named tabs to the origins store, then load named sessions
+  // This ensures tabs that were named before persistence was added get saved
   useEffect(() => {
+    const syncAndLoad = async () => {
+      // First, sync any named open tabs to the store
+      const namedTabs = tabs.filter(t => t.name && t.claudeSessionId);
+      await Promise.all(
+        namedTabs.map(tab =>
+          window.maestro.claude.updateSessionName(cwd, tab.claudeSessionId!, tab.name!)
+            .catch(err => console.warn('[TabSwitcher] Failed to sync tab name:', err))
+        )
+      );
+      // Then load all named sessions (including the ones we just synced)
+      const sessions = await window.maestro.claude.getAllNamedSessions();
+      setNamedSessions(sessions);
+      setNamedSessionsLoaded(true);
+    };
+
     if (!namedSessionsLoaded) {
-      window.maestro.claude.getAllNamedSessions().then(sessions => {
-        setNamedSessions(sessions);
-        setNamedSessionsLoaded(true);
-      });
+      syncAndLoad();
     }
-  }, [namedSessionsLoaded]);
+  }, [namedSessionsLoaded, tabs, cwd]);
 
   // Scroll selected item into view
   useEffect(() => {

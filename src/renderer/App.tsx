@@ -2185,6 +2185,7 @@ export default function MaestroConsole() {
       summary: entry.summary,
       fullResponse: entry.fullResponse,
       claudeSessionId: entry.claudeSessionId,
+      sessionId: activeSession.id,
       sessionName: sessionName,
       projectPath: activeSession.cwd,
       contextUsage: activeSession.contextUsage,
@@ -6291,6 +6292,7 @@ export default function MaestroConsole() {
           theme={theme}
           tabs={activeSession.aiTabs}
           activeTabId={activeSession.activeTabId}
+          cwd={activeSession.cwd}
           shortcut={TAB_SHORTCUTS.tabSwitcher}
           onTabSelect={(tabId) => {
             setSessions(prev => prev.map(s =>
