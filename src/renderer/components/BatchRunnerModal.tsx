@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, RotateCcw, Play, Variable, ChevronDown, ChevronRight, Save } from 'lucide-react';
-import type { Theme } from '../types';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { X, RotateCcw, Play, Variable, ChevronDown, ChevronRight, Save, GripVertical, Plus } from 'lucide-react';
+import type { Theme, BatchDocumentEntry, BatchRunConfig } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { TEMPLATE_VARIABLES } from '../utils/templateVariables';
@@ -49,12 +49,17 @@ If there are no remaining open tasks, exit immediately and state that there is n
 interface BatchRunnerModalProps {
   theme: Theme;
   onClose: () => void;
-  onGo: (prompt: string) => void;
+  onGo: (config: BatchRunConfig) => void;
   onSave: (prompt: string) => void;
   initialPrompt?: string;
   lastModifiedAt?: number;
   showConfirmation: (message: string, onConfirm: () => void) => void;
   scratchpadContent?: string;
+  // New props for multi-doc support
+  folderPath: string;
+  currentDocument: string;
+  allDocuments: string[]; // All available docs in folder (without .md)
+  getDocumentTaskCount: (filename: string) => Promise<number>; // Get task count for a document
 }
 
 // Helper function to count unchecked tasks in scratchpad content
@@ -83,19 +88,80 @@ function formatLastModified(timestamp: number): string {
 }
 
 export function BatchRunnerModal(props: BatchRunnerModalProps) {
-  const { theme, onClose, onGo, onSave, initialPrompt, lastModifiedAt, showConfirmation, scratchpadContent } = props;
+  const {
+    theme,
+    onClose,
+    onGo,
+    onSave,
+    initialPrompt,
+    lastModifiedAt,
+    showConfirmation,
+    scratchpadContent,
+    folderPath,
+    currentDocument,
+    allDocuments,
+    getDocumentTaskCount
+  } = props;
 
-  // Count unchecked tasks
-  const taskCount = countUncheckedTasks(scratchpadContent || '');
-  const hasNoTasks = taskCount === 0;
+  // Document list state
+  const [documents, setDocuments] = useState<BatchDocumentEntry[]>(() => {
+    // Initialize with current document
+    if (currentDocument) {
+      return [{
+        id: crypto.randomUUID(),
+        filename: currentDocument,
+        resetOnCompletion: false,
+        isDuplicate: false
+      }];
+    }
+    return [];
+  });
 
+  // Task counts per document (keyed by filename)
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  const [loadingTaskCounts, setLoadingTaskCounts] = useState(true);
+
+  // Document selector modal state
+  const [showDocSelector, setShowDocSelector] = useState(false);
+  const [selectedDocsInSelector, setSelectedDocsInSelector] = useState<Set<string>>(new Set());
+
+  // Prompt state
   const [prompt, setPrompt] = useState(initialPrompt || DEFAULT_BATCH_PROMPT);
   const [variablesExpanded, setVariablesExpanded] = useState(false);
   const [savedPrompt, setSavedPrompt] = useState(initialPrompt || '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Drag state for reordering
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
   const layerIdRef = useRef<string>();
+
+  // Load task counts for all documents
+  useEffect(() => {
+    const loadTaskCounts = async () => {
+      setLoadingTaskCounts(true);
+      const counts: Record<string, number> = {};
+
+      for (const doc of allDocuments) {
+        try {
+          counts[doc] = await getDocumentTaskCount(doc);
+        } catch {
+          counts[doc] = 0;
+        }
+      }
+
+      setTaskCounts(counts);
+      setLoadingTaskCounts(false);
+    };
+
+    loadTaskCounts();
+  }, [allDocuments, getDocumentTaskCount]);
+
+  // Calculate total tasks across selected documents
+  const totalTaskCount = documents.reduce((sum, doc) => sum + (taskCounts[doc.filename] || 0), 0);
+  const hasNoTasks = totalTaskCount === 0;
 
   // Register layer on mount
   useEffect(() => {
@@ -103,7 +169,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
       type: 'modal',
       priority: MODAL_PRIORITIES.BATCH_RUNNER,
       onEscape: () => {
-        onClose();
+        if (showDocSelector) {
+          setShowDocSelector(false);
+        } else {
+          onClose();
+        }
       }
     });
     layerIdRef.current = id;
@@ -113,21 +183,27 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
         unregisterLayer(layerIdRef.current);
       }
     };
-  }, [registerLayer, unregisterLayer]);
+  }, [registerLayer, unregisterLayer, showDocSelector]);
 
   // Update handler when dependencies change
   useEffect(() => {
     if (layerIdRef.current) {
       updateLayerHandler(layerIdRef.current, () => {
-        onClose();
+        if (showDocSelector) {
+          setShowDocSelector(false);
+        } else {
+          onClose();
+        }
       });
     }
-  }, [onClose, updateLayerHandler]);
+  }, [onClose, updateLayerHandler, showDocSelector]);
 
-  // Focus textarea on mount
+  // Focus textarea on mount (if not showing doc selector)
   useEffect(() => {
-    setTimeout(() => textareaRef.current?.focus(), 100);
-  }, []);
+    if (!showDocSelector) {
+      setTimeout(() => textareaRef.current?.focus(), 100);
+    }
+  }, [showDocSelector]);
 
   const handleReset = () => {
     showConfirmation(
@@ -146,12 +222,97 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
   const handleGo = () => {
     // Also save when running
     onSave(prompt);
-    onGo(prompt);
+    onGo({
+      documents,
+      prompt,
+      loopEnabled: false // Will be added in Phase 4.2.1
+    });
     onClose();
   };
 
+  // Document list handlers
+  const handleRemoveDocument = useCallback((id: string) => {
+    setDocuments(prev => prev.filter(d => d.id !== id));
+  }, []);
+
+  const handleOpenDocSelector = useCallback(() => {
+    // Pre-select currently added documents
+    const currentFilenames = new Set(documents.map(d => d.filename));
+    setSelectedDocsInSelector(currentFilenames);
+    setShowDocSelector(true);
+  }, [documents]);
+
+  const handleAddSelectedDocs = useCallback(() => {
+    // Get filenames already in the list
+    const existingFilenames = new Set(documents.map(d => d.filename));
+
+    // Add new documents that are selected but not already in list
+    const newDocs: BatchDocumentEntry[] = [];
+    selectedDocsInSelector.forEach(filename => {
+      if (!existingFilenames.has(filename)) {
+        newDocs.push({
+          id: crypto.randomUUID(),
+          filename,
+          resetOnCompletion: false,
+          isDuplicate: false
+        });
+      }
+    });
+
+    // Also remove documents that were deselected
+    const filteredDocs = documents.filter(d => selectedDocsInSelector.has(d.filename));
+
+    setDocuments([...filteredDocs, ...newDocs]);
+    setShowDocSelector(false);
+  }, [documents, selectedDocsInSelector]);
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent, id: string) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    if (draggedId && draggedId !== id) {
+      setDragOverId(id);
+    }
+  }, [draggedId]);
+
+  const handleDragEnd = useCallback(() => {
+    if (draggedId && dragOverId && draggedId !== dragOverId) {
+      setDocuments(prev => {
+        const items = [...prev];
+        const draggedIndex = items.findIndex(d => d.id === draggedId);
+        const targetIndex = items.findIndex(d => d.id === dragOverId);
+
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+          const [removed] = items.splice(draggedIndex, 1);
+          items.splice(targetIndex, 0, removed);
+        }
+
+        return items;
+      });
+    }
+    setDraggedId(null);
+    setDragOverId(null);
+  }, [draggedId, dragOverId]);
+
   const isModified = prompt !== DEFAULT_BATCH_PROMPT;
   const hasUnsavedChanges = prompt !== savedPrompt && prompt !== DEFAULT_BATCH_PROMPT;
+
+  // Toggle document selection in the selector modal
+  const toggleDocInSelector = useCallback((filename: string) => {
+    setSelectedDocsInSelector(prev => {
+      const next = new Set(prev);
+      if (next.has(filename)) {
+        next.delete(filename);
+      } else {
+        next.add(filename);
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <div
@@ -162,7 +323,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
       tabIndex={-1}
     >
       <div
-        className="w-[700px] max-h-[80vh] border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        className="w-[700px] max-h-[85vh] border rounded-lg shadow-2xl overflow-hidden flex flex-col"
         style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
       >
         {/* Header */}
@@ -188,7 +349,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
             )}
           </div>
           <div className="flex items-center gap-4">
-            {/* Task Count Badge */}
+            {/* Total Task Count Badge */}
             <div
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
               style={{
@@ -200,13 +361,13 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
                 className="text-lg font-bold"
                 style={{ color: hasNoTasks ? theme.colors.error : theme.colors.success }}
               >
-                {taskCount}
+                {loadingTaskCounts ? '...' : totalTaskCount}
               </span>
               <span
                 className="text-xs font-medium"
                 style={{ color: hasNoTasks ? theme.colors.error : theme.colors.success }}
               >
-                {taskCount === 1 ? 'task' : 'tasks'}
+                {totalTaskCount === 1 ? 'task' : 'tasks'}
               </span>
             </div>
             <button onClick={onClose} style={{ color: theme.colors.textDim }}>
@@ -216,8 +377,108 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex flex-col p-6 gap-4">
-          <div className="flex flex-col gap-2 flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Documents Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-xs font-bold uppercase" style={{ color: theme.colors.textDim }}>
+                Documents to Run
+              </label>
+              <button
+                onClick={handleOpenDocSelector}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                style={{ color: theme.colors.accent }}
+              >
+                <Plus className="w-3 h-3" />
+                Add Docs
+              </button>
+            </div>
+
+            {/* Document List */}
+            <div
+              className="rounded-lg border overflow-hidden"
+              style={{ backgroundColor: theme.colors.bgMain, borderColor: theme.colors.border }}
+            >
+              {documents.length === 0 ? (
+                <div className="p-4 text-center" style={{ color: theme.colors.textDim }}>
+                  <p className="text-sm">No documents selected</p>
+                  <p className="text-xs mt-1">Click "+ Add Docs" to select documents to run</p>
+                </div>
+              ) : (
+                <div className="divide-y" style={{ borderColor: theme.colors.border }}>
+                  {documents.map((doc) => {
+                    const docTaskCount = taskCounts[doc.filename] ?? 0;
+                    const isBeingDragged = draggedId === doc.id;
+                    const isDragTarget = dragOverId === doc.id;
+
+                    return (
+                      <div
+                        key={doc.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, doc.id)}
+                        onDragOver={(e) => handleDragOver(e, doc.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-3 px-3 py-2 transition-all ${
+                          isBeingDragged ? 'opacity-50' : ''
+                        } ${isDragTarget ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                        style={{ borderColor: theme.colors.border }}
+                      >
+                        {/* Drag Handle */}
+                        <GripVertical
+                          className="w-4 h-4 cursor-grab active:cursor-grabbing shrink-0"
+                          style={{ color: theme.colors.textDim }}
+                        />
+
+                        {/* Document Name */}
+                        <span
+                          className="flex-1 text-sm font-medium truncate"
+                          style={{ color: theme.colors.textMain }}
+                        >
+                          {doc.filename}
+                        </span>
+
+                        {/* Task Count Badge */}
+                        <span
+                          className="text-xs px-2 py-0.5 rounded shrink-0"
+                          style={{
+                            backgroundColor: docTaskCount === 0 ? theme.colors.error + '20' : theme.colors.success + '20',
+                            color: docTaskCount === 0 ? theme.colors.error : theme.colors.success
+                          }}
+                        >
+                          {loadingTaskCounts ? '...' : `${docTaskCount} ${docTaskCount === 1 ? 'task' : 'tasks'}`}
+                        </span>
+
+                        {/* Remove Button (only if more than one doc or it's a duplicate) */}
+                        {(documents.length > 1 || doc.isDuplicate) && (
+                          <button
+                            onClick={() => handleRemoveDocument(doc.id)}
+                            className="p-1 rounded hover:bg-white/10 transition-colors shrink-0"
+                            style={{ color: theme.colors.textDim }}
+                            title="Remove document"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Total Summary */}
+            {documents.length > 1 && (
+              <div className="mt-2 text-xs" style={{ color: theme.colors.textDim }}>
+                Total: {loadingTaskCounts ? '...' : totalTaskCount} tasks across {documents.length} documents
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="border-t mb-6" style={{ borderColor: theme.colors.border }} />
+
+          {/* Agent Prompt Section */}
+          <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase" style={{ color: theme.colors.textDim }}>
                 Agent Prompt
@@ -234,7 +495,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
               </button>
             </div>
             <div className="text-[10px] mb-2" style={{ color: theme.colors.textDim }}>
-              Use <code className="px-1 py-0.5 rounded" style={{ backgroundColor: theme.colors.bgActivity }}>$$SCRATCHPAD$$</code> as placeholder for the scratchpad file path
+              Use <code className="px-1 py-0.5 rounded" style={{ backgroundColor: theme.colors.bgActivity }}>$$SCRATCHPAD$$</code> as placeholder for the document file path
             </div>
 
             {/* Template Variables Documentation */}
@@ -285,11 +546,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
               ref={textareaRef}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              className="flex-1 w-full p-4 rounded border bg-transparent outline-none resize-none font-mono text-sm"
+              className="w-full p-4 rounded border bg-transparent outline-none resize-none font-mono text-sm"
               style={{
                 borderColor: theme.colors.border,
                 color: theme.colors.textMain,
-                minHeight: '300px'
+                minHeight: '200px'
               }}
               placeholder="Enter the prompt for the batch agent..."
             />
@@ -317,16 +578,120 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
           </button>
           <button
             onClick={handleGo}
-            disabled={hasNoTasks}
+            disabled={hasNoTasks || documents.length === 0}
             className="flex items-center gap-2 px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ backgroundColor: hasNoTasks ? theme.colors.textDim : theme.colors.accent }}
-            title={hasNoTasks ? 'No unchecked tasks in scratchpad' : 'Run batch processing'}
+            style={{ backgroundColor: (hasNoTasks || documents.length === 0) ? theme.colors.textDim : theme.colors.accent }}
+            title={hasNoTasks ? 'No unchecked tasks in documents' : documents.length === 0 ? 'No documents selected' : 'Run batch processing'}
           >
             <Play className="w-4 h-4" />
             Go
           </button>
         </div>
       </div>
+
+      {/* Document Selector Modal */}
+      {showDocSelector && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]"
+          onClick={() => setShowDocSelector(false)}
+        >
+          <div
+            className="w-[400px] max-h-[60vh] border rounded-lg shadow-2xl overflow-hidden flex flex-col"
+            style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Selector Header */}
+            <div className="p-4 border-b flex items-center justify-between shrink-0" style={{ borderColor: theme.colors.border }}>
+              <h3 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
+                Select Documents
+              </h3>
+              <button onClick={() => setShowDocSelector(false)} style={{ color: theme.colors.textDim }}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Document Checkboxes */}
+            <div className="flex-1 overflow-y-auto p-2">
+              {allDocuments.length === 0 ? (
+                <div className="p-4 text-center" style={{ color: theme.colors.textDim }}>
+                  <p className="text-sm">No documents found in folder</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {allDocuments.map((filename) => {
+                    const isSelected = selectedDocsInSelector.has(filename);
+                    const docTaskCount = taskCounts[filename] ?? 0;
+
+                    return (
+                      <button
+                        key={filename}
+                        onClick={() => toggleDocInSelector(filename)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded transition-colors ${
+                          isSelected ? 'bg-white/10' : 'hover:bg-white/5'
+                        }`}
+                      >
+                        {/* Checkbox */}
+                        <div
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                            isSelected ? 'bg-accent border-accent' : ''
+                          }`}
+                          style={{
+                            borderColor: isSelected ? theme.colors.accent : theme.colors.border,
+                            backgroundColor: isSelected ? theme.colors.accent : 'transparent'
+                          }}
+                        >
+                          {isSelected && (
+                            <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                              <path d="M2 6L5 9L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+
+                        {/* Filename */}
+                        <span
+                          className="flex-1 text-sm text-left truncate"
+                          style={{ color: theme.colors.textMain }}
+                        >
+                          {filename}
+                        </span>
+
+                        {/* Task Count */}
+                        <span
+                          className="text-xs px-2 py-0.5 rounded shrink-0"
+                          style={{
+                            backgroundColor: docTaskCount === 0 ? theme.colors.textDim + '20' : theme.colors.success + '20',
+                            color: docTaskCount === 0 ? theme.colors.textDim : theme.colors.success
+                          }}
+                        >
+                          {loadingTaskCounts ? '...' : `${docTaskCount} ${docTaskCount === 1 ? 'task' : 'tasks'}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Selector Footer */}
+            <div className="p-4 border-t flex justify-end gap-2 shrink-0" style={{ borderColor: theme.colors.border }}>
+              <button
+                onClick={() => setShowDocSelector(false)}
+                className="px-4 py-2 rounded border hover:bg-white/5 transition-colors"
+                style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSelectedDocs}
+                className="px-4 py-2 rounded text-white font-bold"
+                style={{ backgroundColor: theme.colors.accent }}
+              >
+                Add ({selectedDocsInSelector.size})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

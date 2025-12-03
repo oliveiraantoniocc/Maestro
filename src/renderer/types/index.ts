@@ -92,6 +92,21 @@ export interface HistoryEntry {
   validated?: boolean; // For AUTO entries: whether a human has validated the task completion
 }
 
+// Document entry in the batch run queue (supports duplicates)
+export interface BatchDocumentEntry {
+  id: string;              // Unique ID for this entry (for drag-drop and duplicates)
+  filename: string;        // The actual document filename (without .md)
+  resetOnCompletion: boolean;  // Uncheck all boxes when done
+  isDuplicate: boolean;    // True if this is a duplicate (can be removed)
+}
+
+// Configuration for starting a batch run
+export interface BatchRunConfig {
+  documents: BatchDocumentEntry[];  // Ordered list of docs to run
+  prompt: string;
+  loopEnabled: boolean;    // Loop back to first doc when done
+}
+
 // Batch processing state
 export interface BatchRunState {
   isRunning: boolean;
