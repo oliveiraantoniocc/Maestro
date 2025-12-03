@@ -3801,14 +3801,35 @@ function setupIpcHandlers() {
     async (
       _event,
       sessionId: string,
-      playbook: { name: string; documents: any[]; loopEnabled: boolean; prompt: string }
+      playbook: {
+        name: string;
+        documents: any[];
+        loopEnabled: boolean;
+        prompt: string;
+        worktreeSettings?: {
+          branchNameTemplate: string;
+          createPROnCompletion: boolean;
+        };
+      }
     ) => {
       try {
         const playbooks = await readPlaybooks(sessionId);
 
         // Create new playbook with generated ID and timestamps
         const now = Date.now();
-        const newPlaybook = {
+        const newPlaybook: {
+          id: string;
+          name: string;
+          createdAt: number;
+          updatedAt: number;
+          documents: any[];
+          loopEnabled: boolean;
+          prompt: string;
+          worktreeSettings?: {
+            branchNameTemplate: string;
+            createPROnCompletion: boolean;
+          };
+        } = {
           id: crypto.randomUUID(),
           name: playbook.name,
           createdAt: now,
@@ -3817,6 +3838,11 @@ function setupIpcHandlers() {
           loopEnabled: playbook.loopEnabled,
           prompt: playbook.prompt,
         };
+
+        // Include worktree settings if provided
+        if (playbook.worktreeSettings) {
+          newPlaybook.worktreeSettings = playbook.worktreeSettings;
+        }
 
         // Add to list and save
         playbooks.push(newPlaybook);
@@ -3844,6 +3870,10 @@ function setupIpcHandlers() {
         loopEnabled: boolean;
         prompt: string;
         updatedAt: number;
+        worktreeSettings?: {
+          branchNameTemplate: string;
+          createPROnCompletion: boolean;
+        };
       }>
     ) => {
       try {

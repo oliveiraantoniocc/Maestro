@@ -514,6 +514,10 @@ contextBridge.exposeInMainWorld('maestro', {
         documents: Array<{ filename: string; resetOnCompletion: boolean }>;
         loopEnabled: boolean;
         prompt: string;
+        worktreeSettings?: {
+          branchNameTemplate: string;
+          createPROnCompletion: boolean;
+        };
       }
     ) => ipcRenderer.invoke('playbooks:create', sessionId, playbook),
     update: (
@@ -524,6 +528,10 @@ contextBridge.exposeInMainWorld('maestro', {
         documents: Array<{ filename: string; resetOnCompletion: boolean }>;
         loopEnabled: boolean;
         prompt: string;
+        worktreeSettings?: {
+          branchNameTemplate: string;
+          createPROnCompletion: boolean;
+        };
       }>
     ) => ipcRenderer.invoke('playbooks:update', sessionId, playbookId, updates),
     delete: (sessionId: string, playbookId: string) =>
