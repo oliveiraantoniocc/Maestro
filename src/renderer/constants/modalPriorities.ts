@@ -23,6 +23,9 @@ export const MODAL_PRIORITIES = {
   /** Playbook delete confirmation - high priority, appears on top of BatchRunner */
   PLAYBOOK_DELETE_CONFIRM: 950,
 
+  /** Playbook name input modal - appears on top of BatchRunner */
+  PLAYBOOK_NAME: 940,
+
   /** Rename instance modal */
   RENAME_INSTANCE: 900,
 

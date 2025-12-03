@@ -5,6 +5,7 @@ import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { TEMPLATE_VARIABLES } from '../utils/templateVariables';
 import { PlaybookDeleteConfirmModal } from './PlaybookDeleteConfirmModal';
+import { PlaybookNameModal } from './PlaybookNameModal';
 
 // Default batch processing prompt
 export const DEFAULT_BATCH_PROMPT = `CRITICAL: You must complete EXACTLY ONE task and then exit. Do not attempt multiple tasks.
@@ -146,12 +147,10 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
   const [loadingPlaybooks, setLoadingPlaybooks] = useState(true);
   const [showPlaybookDropdown, setShowPlaybookDropdown] = useState(false);
   const [showSavePlaybookModal, setShowSavePlaybookModal] = useState(false);
-  const [newPlaybookName, setNewPlaybookName] = useState('');
   const [savingPlaybook, setSavingPlaybook] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [playbookToDelete, setPlaybookToDelete] = useState<Playbook | null>(null);
   const playbackDropdownRef = useRef<HTMLDivElement>(null);
-  const savePlaybookInputRef = useRef<HTMLInputElement>(null);
 
   const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
   const layerIdRef = useRef<string>();
@@ -238,7 +237,6 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
           setPlaybookToDelete(null);
         } else if (showSavePlaybookModal) {
           setShowSavePlaybookModal(false);
-          setNewPlaybookName('');
         } else if (showDocSelector) {
           setShowDocSelector(false);
         } else {
@@ -264,7 +262,6 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
           setPlaybookToDelete(null);
         } else if (showSavePlaybookModal) {
           setShowSavePlaybookModal(false);
-          setNewPlaybookName('');
         } else if (showDocSelector) {
           setShowDocSelector(false);
         } else {
@@ -471,14 +468,13 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
   }, []);
 
   // Handle saving a new playbook
-  const handleSaveAsPlaybook = useCallback(async () => {
-    const trimmedName = newPlaybookName.trim();
-    if (!trimmedName || savingPlaybook) return;
+  const handleSaveAsPlaybook = useCallback(async (name: string) => {
+    if (savingPlaybook) return;
 
     setSavingPlaybook(true);
     try {
       const result = await window.maestro.playbooks.create(sessionId, {
-        name: trimmedName,
+        name,
         documents: documents.map(d => ({
           filename: d.filename,
           resetOnCompletion: d.resetOnCompletion
@@ -491,13 +487,12 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
         setPlaybooks(prev => [...prev, result.playbook]);
         setLoadedPlaybook(result.playbook);
         setShowSavePlaybookModal(false);
-        setNewPlaybookName('');
       }
     } catch (error) {
       console.error('Failed to save playbook:', error);
     }
     setSavingPlaybook(false);
-  }, [sessionId, newPlaybookName, documents, loopEnabled, prompt, savingPlaybook]);
+  }, [sessionId, documents, loopEnabled, prompt, savingPlaybook]);
 
   // Handle updating an existing playbook
   const handleSaveUpdate = useCallback(async () => {
@@ -531,13 +526,6 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
       handleLoadPlaybook(loadedPlaybook);
     }
   }, [loadedPlaybook, handleLoadPlaybook]);
-
-  // Focus input when save modal opens
-  useEffect(() => {
-    if (showSavePlaybookModal) {
-      setTimeout(() => savePlaybookInputRef.current?.focus(), 100);
-    }
-  }, [showSavePlaybookModal]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1131,85 +1119,13 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 
       {/* Save Playbook Modal */}
       {showSavePlaybookModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]"
-          onClick={() => {
-            setShowSavePlaybookModal(false);
-            setNewPlaybookName('');
-          }}
-        >
-          <div
-            className="w-[400px] border rounded-lg shadow-2xl overflow-hidden"
-            style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: theme.colors.border }}>
-              <h3 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
-                Save as Playbook
-              </h3>
-              <button
-                onClick={() => {
-                  setShowSavePlaybookModal(false);
-                  setNewPlaybookName('');
-                }}
-                style={{ color: theme.colors.textDim }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-4">
-              <label className="block text-xs font-bold uppercase mb-2" style={{ color: theme.colors.textDim }}>
-                Playbook Name
-              </label>
-              <input
-                ref={savePlaybookInputRef}
-                type="text"
-                value={newPlaybookName}
-                onChange={(e) => setNewPlaybookName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newPlaybookName.trim()) {
-                    handleSaveAsPlaybook();
-                  }
-                }}
-                placeholder="Enter a name for this playbook..."
-                className="w-full px-3 py-2 rounded border bg-transparent outline-none focus:ring-1"
-                style={{
-                  borderColor: theme.colors.border,
-                  color: theme.colors.textMain,
-                }}
-              />
-              <p className="text-xs mt-2" style={{ color: theme.colors.textDim }}>
-                Saves the current document list, order, reset settings, loop mode, and prompt.
-              </p>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 border-t flex justify-end gap-2" style={{ borderColor: theme.colors.border }}>
-              <button
-                onClick={() => {
-                  setShowSavePlaybookModal(false);
-                  setNewPlaybookName('');
-                }}
-                className="px-4 py-2 rounded border hover:bg-white/5 transition-colors"
-                style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveAsPlaybook}
-                disabled={!newPlaybookName.trim() || savingPlaybook}
-                className="flex items-center gap-2 px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ backgroundColor: theme.colors.accent }}
-              >
-                <Bookmark className="w-4 h-4" />
-                {savingPlaybook ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PlaybookNameModal
+          theme={theme}
+          onSave={handleSaveAsPlaybook}
+          onCancel={() => setShowSavePlaybookModal(false)}
+          title="Save as Playbook"
+          saveButtonText={savingPlaybook ? 'Saving...' : 'Save'}
+        />
       )}
 
       {/* Playbook Delete Confirmation Modal */}
