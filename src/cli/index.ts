@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// Maestro Playbook CLI
-// Run Maestro playbooks from the command line
+// Maestro CLI
+// Command-line interface for Maestro
 
 import { Command } from 'commander';
 import { listGroups } from './commands/list-groups';
 import { listAgents } from './commands/list-agents';
 import { listPlaybooks } from './commands/list-playbooks';
 import { showPlaybook } from './commands/show-playbook';
+import { showAgent } from './commands/show-agent';
 import { runPlaybook } from './commands/run-playbook';
 
 const program = new Command();
 
 program
-  .name('maestro-playbook')
-  .description('CLI for running Maestro playbooks')
+  .name('maestro-cli')
+  .description('Command-line interface for Maestro')
   .version('0.1.0');
 
 // List commands
@@ -43,6 +44,12 @@ list
 const show = program.command('show').description('Show details of a resource');
 
 show
+  .command('agent <id>')
+  .description('Show agent details including history and usage stats')
+  .option('--json', 'Output as JSON (for scripting)')
+  .action(showAgent);
+
+show
   .command('playbook <id>')
   .description('Show detailed information about a playbook')
   .option('--json', 'Output as JSON (for scripting)')
@@ -50,9 +57,8 @@ show
 
 // Run command
 program
-  .command('run')
+  .command('run <playbook-id>')
   .description('Run a playbook')
-  .requiredOption('-p, --playbook <id>', 'Playbook ID')
   .option('--dry-run', 'Show what would be executed without running')
   .option('--no-history', 'Do not write history entries')
   .option('--json', 'Output as JSON lines (for scripting)')

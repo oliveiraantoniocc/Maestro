@@ -346,7 +346,7 @@ You can run separate batch processes in different Maestro sessions simultaneousl
 
 ## Command Line Interface
 
-Maestro includes a CLI tool (`maestro-playbook`) for running playbooks from the command line, cron jobs, or CI/CD pipelines. The CLI requires Node.js (which you already have if you're using Claude Code).
+Maestro includes a CLI tool (`maestro-cli`) for managing agents and running playbooks from the command line, cron jobs, or CI/CD pipelines. The CLI requires Node.js (which you already have if you're using Claude Code).
 
 ### Installation
 
@@ -354,44 +354,50 @@ The CLI is bundled with Maestro as a JavaScript file. Create a shell wrapper to 
 
 ```bash
 # macOS (after installing Maestro.app)
-echo '#!/bin/bash\nnode "/Applications/Maestro.app/Contents/Resources/maestro-playbook.js" "$@"' | sudo tee /usr/local/bin/maestro-playbook && sudo chmod +x /usr/local/bin/maestro-playbook
+echo '#!/bin/bash\nnode "/Applications/Maestro.app/Contents/Resources/maestro-cli.js" "$@"' | sudo tee /usr/local/bin/maestro-cli && sudo chmod +x /usr/local/bin/maestro-cli
 
 # Linux (deb/rpm installs to /opt)
-echo '#!/bin/bash\nnode "/opt/Maestro/resources/maestro-playbook.js" "$@"' | sudo tee /usr/local/bin/maestro-playbook && sudo chmod +x /usr/local/bin/maestro-playbook
+echo '#!/bin/bash\nnode "/opt/Maestro/resources/maestro-cli.js" "$@"' | sudo tee /usr/local/bin/maestro-cli && sudo chmod +x /usr/local/bin/maestro-cli
 
 # Windows (PowerShell as Administrator) - create a batch file
 @"
 @echo off
-node "%ProgramFiles%\Maestro\resources\maestro-playbook.js" %*
-"@ | Out-File -FilePath "$env:ProgramFiles\Maestro\maestro-playbook.cmd" -Encoding ASCII
+node "%ProgramFiles%\Maestro\resources\maestro-cli.js" %*
+"@ | Out-File -FilePath "$env:ProgramFiles\Maestro\maestro-cli.cmd" -Encoding ASCII
 ```
 
 Alternatively, run directly with Node.js:
 ```bash
-node "/Applications/Maestro.app/Contents/Resources/maestro-playbook.js" list groups
+node "/Applications/Maestro.app/Contents/Resources/maestro-cli.js" list groups
 ```
 
 ### Usage
 
 ```bash
 # List all groups
-maestro-playbook list groups
+maestro-cli list groups
 
 # List all agents
-maestro-playbook list agents
-maestro-playbook list agents --group <group-id>
+maestro-cli list agents
+maestro-cli list agents --group <group-id>
+
+# Show agent details (history, usage stats, cost)
+maestro-cli show agent <agent-id>
 
 # List playbooks for an agent
-maestro-playbook list playbooks --agent <agent-id>
+maestro-cli list playbooks --agent <agent-id>
+
+# Show playbook details
+maestro-cli show playbook <playbook-id>
 
 # Run a playbook
-maestro-playbook run --agent <agent-id> --playbook <playbook-id>
+maestro-cli run <playbook-id>
 
 # Dry run (shows what would be executed)
-maestro-playbook run --agent <agent-id> --playbook <playbook-id> --dry-run
+maestro-cli run <playbook-id> --dry-run
 
 # Run without writing to history
-maestro-playbook run --agent <agent-id> --playbook <playbook-id> --no-history
+maestro-cli run <playbook-id> --no-history
 ```
 
 ### JSON Output
@@ -400,7 +406,7 @@ By default, commands output human-readable formatted text. Use `--json` for mach
 
 ```bash
 # Human-readable output (default)
-maestro-playbook list groups
+maestro-cli list groups
 GROUPS (2)
 
   🎨  Frontend
@@ -409,12 +415,12 @@ GROUPS (2)
       group-def456
 
 # JSON output for scripting
-maestro-playbook list groups --json
+maestro-cli list groups --json
 {"type":"group","id":"group-abc123","name":"Frontend","emoji":"🎨","timestamp":...}
 {"type":"group","id":"group-def456","name":"Backend","emoji":"⚙️","timestamp":...}
 
 # Running a playbook with JSON streams events
-maestro-playbook run -a <agent-id> -p <playbook-id> --json
+maestro-cli run <playbook-id> --json
 {"type":"start","timestamp":...,"playbook":{...}}
 {"type":"document_start","timestamp":...,"document":"tasks.md","taskCount":5}
 {"type":"task_start","timestamp":...,"taskIndex":0}
@@ -427,7 +433,7 @@ maestro-playbook run -a <agent-id> -p <playbook-id> --json
 
 ```bash
 # Run a playbook every hour (use --json for log parsing)
-0 * * * * /usr/local/bin/maestro-playbook run -a <agent-id> -p <playbook-id> --json >> /var/log/maestro.jsonl 2>&1
+0 * * * * /usr/local/bin/maestro-cli run <playbook-id> --json >> /var/log/maestro.jsonl 2>&1
 ```
 
 ### Requirements
@@ -485,4 +491,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture detai
 
 ## License
 
-[MIT License](LICENSE)
+[AGPL-3.0 License](LICENSE)

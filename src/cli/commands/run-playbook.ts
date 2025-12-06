@@ -9,14 +9,13 @@ import { emitError } from '../output/jsonl';
 import { formatRunEvent, formatError, formatInfo, RunEvent } from '../output/formatter';
 
 interface RunPlaybookOptions {
-  playbook: string;
   dryRun?: boolean;
   history?: boolean; // commander uses --no-history which becomes history: false
   json?: boolean;
   debug?: boolean;
 }
 
-export async function runPlaybook(options: RunPlaybookOptions): Promise<void> {
+export async function runPlaybook(playbookId: string, options: RunPlaybookOptions): Promise<void> {
   const useJson = options.json;
 
   try {
@@ -36,7 +35,7 @@ export async function runPlaybook(options: RunPlaybookOptions): Promise<void> {
 
     // Find playbook across all agents
     try {
-      const result = findPlaybookById(options.playbook);
+      const result = findPlaybookById(playbookId);
       playbook = result.playbook;
       agentId = result.agentId;
     } catch (error) {

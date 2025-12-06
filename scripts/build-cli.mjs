@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '..');
 
-const outfile = path.join(rootDir, 'dist/cli/maestro-playbook.js');
+const outfile = path.join(rootDir, 'dist/cli/maestro-cli.js');
 
 async function build() {
   console.log('Building CLI with esbuild...');

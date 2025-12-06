@@ -13,7 +13,7 @@
     "url": "https://github.com/yourusername/maestro.git"
   },
   "bin": {
-    "maestro-playbook": "./dist/cli/maestro-playbook.js"
+    "maestro-cli": "./dist/cli/maestro-cli.js"
   },
   "scripts": {
     "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\"",
@@ -67,8 +67,8 @@
       "icon": "build/icon.icns",
       "extraResources": [
         {
-          "from": "dist/cli/maestro-playbook.js",
-          "to": "maestro-playbook.js"
+          "from": "dist/cli/maestro-cli.js",
+          "to": "maestro-cli.js"
         }
       ]
     },
@@ -90,8 +90,8 @@
       "icon": "build/icon.ico",
       "extraResources": [
         {
-          "from": "dist/cli/maestro-playbook.js",
-          "to": "maestro-playbook.js"
+          "from": "dist/cli/maestro-cli.js",
+          "to": "maestro-cli.js"
         }
       ]
     },
@@ -105,8 +105,8 @@
       "icon": "build/icon.png",
       "extraResources": [
         {
-          "from": "dist/cli/maestro-playbook.js",
-          "to": "maestro-playbook.js"
+          "from": "dist/cli/maestro-cli.js",
+          "to": "maestro-cli.js"
         }
       ]
     },

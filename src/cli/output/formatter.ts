@@ -380,6 +380,116 @@ export function formatRunEvent(event: RunEvent): string {
   }
 }
 
+// Agent detail formatting
+export interface AgentDetailDisplay {
+  id: string;
+  name: string;
+  toolType: string;
+  cwd: string;
+  projectRoot: string;
+  groupId?: string;
+  groupName?: string;
+  autoRunFolderPath?: string;
+  stats: {
+    historyEntries: number;
+    successCount: number;
+    failureCount: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCacheReadTokens: number;
+    totalCacheCreationTokens: number;
+    totalCost: number;
+    totalElapsedMs: number;
+  };
+  recentHistory: {
+    id: string;
+    type: string;
+    timestamp: number;
+    summary: string;
+    success?: boolean;
+    elapsedTimeMs?: number;
+    cost?: number;
+  }[];
+}
+
+function formatTokens(count: number): string {
+  if (count >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1)}M`;
+  } else if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1)}K`;
+  }
+  return count.toString();
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3600_000) return `${(ms / 60_000).toFixed(1)}m`;
+  return `${(ms / 3600_000).toFixed(1)}h`;
+}
+
+export function formatAgentDetail(agent: AgentDetailDisplay): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(bold(c('cyan', 'AGENT')));
+  lines.push('');
+
+  // Basic info
+  lines.push(`  ${c('white', 'Name:')}       ${agent.name}`);
+  lines.push(`  ${c('white', 'ID:')}         ${agent.id}`);
+  lines.push(`  ${c('white', 'Type:')}       ${c('green', agent.toolType)}`);
+  lines.push(`  ${c('white', 'Directory:')}  ${dim(agent.cwd)}`);
+
+  if (agent.groupName) {
+    lines.push(`  ${c('white', 'Group:')}      ${agent.groupName}`);
+  }
+
+  if (agent.autoRunFolderPath) {
+    lines.push(`  ${c('white', 'Auto Run:')}   ${dim(agent.autoRunFolderPath)}`);
+  }
+
+  lines.push('');
+
+  // Stats
+  lines.push(bold(c('cyan', 'USAGE STATS')));
+  lines.push('');
+
+  const { stats } = agent;
+  const successRate = stats.historyEntries > 0
+    ? ((stats.successCount / stats.historyEntries) * 100).toFixed(0)
+    : '0';
+
+  lines.push(`  ${c('white', 'Sessions:')}      ${stats.historyEntries} total ${dim(`(${stats.successCount} success, ${stats.failureCount} failed, ${successRate}% success rate)`)}`);
+  lines.push(`  ${c('white', 'Total Cost:')}    ${c('yellow', `$${stats.totalCost.toFixed(4)}`)}`);
+  lines.push(`  ${c('white', 'Total Time:')}    ${formatDuration(stats.totalElapsedMs)}`);
+  lines.push('');
+  lines.push(`  ${c('white', 'Tokens:')}        ${dim('Input:')} ${formatTokens(stats.totalInputTokens)}  ${dim('Output:')} ${formatTokens(stats.totalOutputTokens)}`);
+  lines.push(`  ${c('white', 'Cache:')}         ${dim('Read:')} ${formatTokens(stats.totalCacheReadTokens)}  ${dim('Created:')} ${formatTokens(stats.totalCacheCreationTokens)}`);
+
+  // Recent history
+  if (agent.recentHistory.length > 0) {
+    lines.push('');
+    lines.push(bold(c('cyan', 'RECENT HISTORY')) + dim(` (last ${agent.recentHistory.length})`));
+    lines.push('');
+
+    for (const entry of agent.recentHistory) {
+      const date = new Date(entry.timestamp);
+      const dateStr = date.toLocaleDateString();
+      const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const icon = entry.success === true ? c('green', '✓') : entry.success === false ? c('red', '✗') : c('gray', '•');
+      const typeLabel = c('gray', `[${entry.type}]`);
+      const summary = truncate(entry.summary, 50);
+      const costStr = entry.cost !== undefined ? dim(` $${entry.cost.toFixed(4)}`) : '';
+      const timeElapsed = entry.elapsedTimeMs ? dim(` ${formatDuration(entry.elapsedTimeMs)}`) : '';
+
+      lines.push(`  ${icon} ${dim(`${dateStr} ${timeStr}`)} ${typeLabel} ${summary}${costStr}${timeElapsed}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
 // Error formatting
 export function formatError(message: string): string {
   return `${c('red', '✗')} ${c('red', 'Error:')} ${message}`;
