@@ -217,6 +217,8 @@ let agentDetector: AgentDetector | null = null;
 let historyFileWatcherInterval: NodeJS.Timeout | null = null;
 let lastHistoryFileMtime: number = 0;
 let historyNeedsReload: boolean = false;
+let cliActivityWatcherInterval: NodeJS.Timeout | null = null;
+let lastCliActivityMtime: number = 0;
 
 /**
  * Create and configure the web server with all necessary callbacks.
@@ -654,6 +656,9 @@ app.whenReady().then(() => {
   // Start history file watcher (polls every 60 seconds for external changes)
   startHistoryFileWatcher();
 
+  // Start CLI activity watcher (polls every 2 seconds for CLI playbook runs)
+  startCliActivityWatcher();
+
   // Note: Web server is not auto-started - it starts when user enables web interface
   // via live:startServer IPC call from the renderer
 
@@ -676,6 +681,11 @@ app.on('before-quit', async () => {
   if (historyFileWatcherInterval) {
     clearInterval(historyFileWatcherInterval);
     historyFileWatcherInterval = null;
+  }
+  // Stop CLI activity watcher
+  if (cliActivityWatcherInterval) {
+    clearInterval(cliActivityWatcherInterval);
+    cliActivityWatcherInterval = null;
   }
   // Clean up all running processes
   logger.info('Killing all running processes', 'Shutdown');
@@ -722,6 +732,48 @@ function startHistoryFileWatcher() {
   }, 60000); // 60 seconds
 
   logger.info('History file watcher started', 'Startup');
+}
+
+/**
+ * Start CLI activity file watcher
+ * Polls cli-activity.json every 2 seconds to detect when CLI is running playbooks
+ */
+function startCliActivityWatcher() {
+  const cliActivityPath = path.join(app.getPath('userData'), 'cli-activity.json');
+
+  // Get initial mtime
+  try {
+    const stats = fsSync.statSync(cliActivityPath);
+    lastCliActivityMtime = stats.mtimeMs;
+  } catch {
+    lastCliActivityMtime = 0;
+  }
+
+  // Poll every 2 seconds (more frequent for responsive UI)
+  cliActivityWatcherInterval = setInterval(() => {
+    try {
+      const stats = fsSync.statSync(cliActivityPath);
+      if (stats.mtimeMs > lastCliActivityMtime) {
+        lastCliActivityMtime = stats.mtimeMs;
+        // File was modified, notify renderer
+        logger.debug('CLI activity file changed, notifying renderer', 'CliActivityWatcher');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('cli:activityChange');
+        }
+      }
+    } catch {
+      // File might not exist, that's fine - means no CLI activity
+      // Check if we had activity before and now it's gone (file deleted or process ended)
+      if (lastCliActivityMtime > 0) {
+        lastCliActivityMtime = 0;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('cli:activityChange');
+        }
+      }
+    }
+  }, 2000); // 2 seconds
+
+  logger.info('CLI activity watcher started', 'Startup');
 }
 
 function setupIpcHandlers() {
@@ -784,12 +836,14 @@ function setupIpcHandlers() {
           // Session exists - check if state changed
           if (prevSession.state !== session.state ||
               prevSession.inputMode !== session.inputMode ||
-              prevSession.name !== session.name) {
+              prevSession.name !== session.name ||
+              JSON.stringify(prevSession.cliActivity) !== JSON.stringify(session.cliActivity)) {
             webServer.broadcastSessionStateChange(session.id, session.state, {
               name: session.name,
               toolType: session.toolType,
               inputMode: session.inputMode,
               cwd: session.cwd,
+              cliActivity: session.cliActivity,
             });
           }
         } else {
@@ -3201,6 +3255,30 @@ function setupIpcHandlers() {
     } catch (error) {
       logger.error('Error deleting temp file', 'TempFile', error);
       return { success: false, error: String(error) };
+    }
+  });
+
+  // CLI activity status (for detecting when CLI is running playbooks)
+  ipcMain.handle('cli:getActivity', async () => {
+    try {
+      const cliActivityPath = path.join(app.getPath('userData'), 'cli-activity.json');
+      const content = fsSync.readFileSync(cliActivityPath, 'utf-8');
+      const data = JSON.parse(content);
+      const activities = data.activities || [];
+
+      // Filter out stale activities (processes no longer running)
+      const stillRunning = activities.filter((activity: { pid: number }) => {
+        try {
+          process.kill(activity.pid, 0); // Doesn't kill, just checks if process exists
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      return stillRunning;
+    } catch {
+      return [];
     }
   });
 

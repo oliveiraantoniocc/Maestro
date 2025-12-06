@@ -1471,6 +1471,11 @@ export class WebServer {
     toolType?: string;
     inputMode?: string;
     cwd?: string;
+    cliActivity?: {
+      playbookId: string;
+      playbookName: string;
+      startedAt: number;
+    };
   }) {
     this.broadcastToWebClients({
       type: 'session_state_change',

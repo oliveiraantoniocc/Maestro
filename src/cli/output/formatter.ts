@@ -319,21 +319,30 @@ export function formatRunEvent(event: RunEvent): string {
     case 'task_start': {
       const taskIndex = (event.taskIndex as number) + 1;
       const task = truncate(event.task as string || '', 60);
-      return `${timeStr}   ${c('yellow', '⏳')} Task ${taskIndex}: ${task}`;
+      // Indent: 3 spaces under document
+      return `${timeStr}    ${c('yellow', '⏳')} Task ${taskIndex}: ${task}`;
     }
 
     case 'task_preview': {
       const taskIndex = (event.taskIndex as number) + 1;
       const task = truncate(event.task as string || '', 70);
-      return `${timeStr}       ${dim(`${taskIndex}.`)} ${task}`;
+      // Indent: 3 spaces under document (same as task_start)
+      return `${timeStr}    ${dim(`${taskIndex}.`)} ${task}`;
     }
 
     case 'task_complete': {
       const success = event.success as boolean;
       const elapsed = ((event.elapsedMs as number) / 1000).toFixed(1);
-      const summary = truncate(event.summary as string || '', 70);
+      const summary = truncate(event.summary as string || '', 60);
       const icon = success ? c('green', '✓') : c('red', '✗');
-      return `${timeStr}   ${icon} ${summary} ${dim(`(${elapsed}s)`)}`;
+      // Indent: 6 spaces under task (result of task)
+      return `${timeStr}       ${icon} ${summary} ${dim(`(${elapsed}s)`)}`;
+    }
+
+    case 'history_write': {
+      const entryId = event.entryId as string;
+      // Indent: 6 spaces under task (same level as task_complete)
+      return `${timeStr}       ${c('gray', '🔖')} ${dim(`[history] Wrote history entry: ${entryId.slice(0, 8)}`)}`;
     }
 
     case 'document_complete': {

@@ -492,6 +492,16 @@ contextBridge.exposeInMainWorld('maestro', {
     reload: () => ipcRenderer.invoke('history:reload'),
   },
 
+  // CLI activity API (for detecting when CLI is running playbooks)
+  cli: {
+    getActivity: () => ipcRenderer.invoke('cli:getActivity'),
+    onActivityChange: (handler: () => void) => {
+      const wrappedHandler = () => handler();
+      ipcRenderer.on('cli:activityChange', wrappedHandler);
+      return () => ipcRenderer.removeListener('cli:activityChange', wrappedHandler);
+    },
+  },
+
   // Notification API
   notification: {
     show: (title: string, body: string) =>
@@ -936,6 +946,18 @@ export interface MaestroAPI {
     update: (entryId: string, updates: { validated?: boolean }) => Promise<boolean>;
     onExternalChange: (handler: () => void) => () => void;
     reload: () => Promise<boolean>;
+  };
+  cli: {
+    getActivity: () => Promise<Array<{
+      sessionId: string;
+      playbookId: string;
+      playbookName: string;
+      startedAt: number;
+      pid: number;
+      currentTask?: string;
+      currentDocument?: string;
+    }>>;
+    onActivityChange: (handler: () => void) => () => void;
   };
   notification: {
     show: (title: string, body: string) => Promise<{ success: boolean; error?: string }>;

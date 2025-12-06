@@ -13,6 +13,7 @@ import {
 } from './agent-spawner';
 import { addHistoryEntry, readGroups } from './storage';
 import { substituteTemplateVariables, TemplateContext } from '../../shared/templateVariables';
+import { registerCliActivity, updateCliActivity, unregisterCliActivity } from '../../shared/cli-activity';
 
 // Synopsis prompt for batch tasks
 const BATCH_SYNOPSIS_PROMPT = `Provide a brief synopsis of what you just accomplished in this task using this exact format:
@@ -56,6 +57,21 @@ function generateUUID(): string {
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+/**
+ * Format duration in human-readable format for loop summaries
+ */
+function formatLoopDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${hours}h ${remainingMinutes}m`;
 }
 
 /**
@@ -114,6 +130,15 @@ export async function* runPlaybook(
   const sessionGroup = groups.find(g => g.id === session.groupId);
   const groupName = sessionGroup?.name;
 
+  // Register CLI activity so desktop app knows this session is busy
+  registerCliActivity({
+    sessionId: session.id,
+    playbookId: playbook.id,
+    playbookName: playbook.name,
+    startedAt: Date.now(),
+    pid: process.pid,
+  });
+
   // Emit start event
   yield {
     type: 'start',
@@ -168,6 +193,7 @@ export async function* runPlaybook(
   }
 
   if (initialTotalTasks === 0) {
+    unregisterCliActivity(session.id);
     yield {
       type: 'error',
       timestamp: Date.now(),
@@ -218,6 +244,7 @@ export async function* runPlaybook(
       };
     }
 
+    unregisterCliActivity(session.id);
     yield {
       type: 'complete',
       timestamp: Date.now(),
@@ -241,6 +268,109 @@ export async function* runPlaybook(
   let loopTotalInputTokens = 0;
   let loopTotalOutputTokens = 0;
   let loopTotalCost = 0;
+
+  // Total tracking across all loops
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+
+  // Helper to create final loop entry with exit reason
+  const createFinalLoopEntry = (exitReason: string): void => {
+    if (!writeHistory) return;
+    // Only write if looping was enabled and we did some work
+    if (!playbook.loopEnabled && loopIteration === 0) return;
+    if (loopTasksCompleted === 0 && loopIteration === 0) return;
+
+    const loopElapsedMs = Date.now() - loopStartTime;
+    const loopNumber = loopIteration + 1;
+    const loopSummary = `Loop ${loopNumber} (final) completed: ${loopTasksCompleted} task${loopTasksCompleted !== 1 ? 's' : ''} accomplished`;
+
+    const loopUsageStats: UsageStats | undefined =
+      loopTotalInputTokens > 0 || loopTotalOutputTokens > 0
+        ? {
+            inputTokens: loopTotalInputTokens,
+            outputTokens: loopTotalOutputTokens,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            totalCostUsd: loopTotalCost,
+            contextWindow: 200000,
+          }
+        : undefined;
+
+    const loopDetails = [
+      `**Loop ${loopNumber} (final) Summary**`,
+      '',
+      `- **Tasks Accomplished:** ${loopTasksCompleted}`,
+      `- **Duration:** ${formatLoopDuration(loopElapsedMs)}`,
+      loopTotalInputTokens > 0 || loopTotalOutputTokens > 0
+        ? `- **Tokens:** ${(loopTotalInputTokens + loopTotalOutputTokens).toLocaleString()} (${loopTotalInputTokens.toLocaleString()} in / ${loopTotalOutputTokens.toLocaleString()} out)`
+        : '',
+      loopTotalCost > 0 ? `- **Cost:** $${loopTotalCost.toFixed(4)}` : '',
+      `- **Exit Reason:** ${exitReason}`,
+    ].filter(line => line !== '').join('\n');
+
+    const historyEntry: HistoryEntry = {
+      id: generateUUID(),
+      type: 'LOOP',
+      timestamp: Date.now(),
+      summary: loopSummary,
+      fullResponse: loopDetails,
+      projectPath: session.cwd,
+      sessionId: session.id,
+      success: true,
+      elapsedTimeMs: loopElapsedMs,
+      usageStats: loopUsageStats,
+    };
+    addHistoryEntry(historyEntry);
+  };
+
+  // Helper to create total Auto Run summary
+  const createAutoRunSummary = (): void => {
+    if (!writeHistory) return;
+    // Only write if we completed multiple loops or if looping was enabled
+    if (!playbook.loopEnabled && loopIteration === 0) return;
+
+    const totalElapsedMs = Date.now() - batchStartTime;
+    const loopsCompleted = loopIteration + 1;
+    const summary = `Auto Run completed: ${totalCompletedTasks} tasks in ${loopsCompleted} loop${loopsCompleted !== 1 ? 's' : ''}`;
+
+    const totalUsageStats: UsageStats | undefined =
+      totalInputTokens > 0 || totalOutputTokens > 0
+        ? {
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            totalCostUsd: totalCost,
+            contextWindow: 200000,
+          }
+        : undefined;
+
+    const details = [
+      `**Auto Run Summary**`,
+      '',
+      `- **Total Tasks Completed:** ${totalCompletedTasks}`,
+      `- **Loops Completed:** ${loopsCompleted}`,
+      `- **Total Duration:** ${formatLoopDuration(totalElapsedMs)}`,
+      totalInputTokens > 0 || totalOutputTokens > 0
+        ? `- **Total Tokens:** ${(totalInputTokens + totalOutputTokens).toLocaleString()} (${totalInputTokens.toLocaleString()} in / ${totalOutputTokens.toLocaleString()} out)`
+        : '',
+      totalCost > 0 ? `- **Total Cost:** $${totalCost.toFixed(4)}` : '',
+    ].filter(line => line !== '').join('\n');
+
+    const historyEntry: HistoryEntry = {
+      id: generateUUID(),
+      type: 'AUTO',
+      timestamp: Date.now(),
+      summary,
+      fullResponse: details,
+      projectPath: session.cwd,
+      sessionId: session.id,
+      success: true,
+      elapsedTimeMs: totalElapsedMs,
+      usageStats: totalUsageStats,
+    };
+    addHistoryEntry(historyEntry);
+  };
 
   // Main processing loop
   while (true) {
@@ -349,6 +479,8 @@ export async function* runPlaybook(
           loopTotalOutputTokens += result.usageStats.outputTokens || 0;
           loopTotalCost += result.usageStats.totalCostUsd || 0;
           totalCost += result.usageStats.totalCostUsd || 0;
+          totalInputTokens += result.usageStats.inputTokens || 0;
+          totalOutputTokens += result.usageStats.outputTokens || 0;
         }
 
         // Generate synopsis
@@ -405,10 +537,9 @@ export async function* runPlaybook(
           addHistoryEntry(historyEntry);
           if (debug) {
             yield {
-              type: 'debug',
+              type: 'history_write',
               timestamp: Date.now(),
-              category: 'history',
-              message: `Wrote history entry: ${historyEntry.id.slice(0, 8)}`,
+              entryId: historyEntry.id,
             };
           }
         }
@@ -452,6 +583,7 @@ export async function* runPlaybook(
           message: 'Exiting: loopEnabled is false',
         };
       }
+      createFinalLoopEntry('Looping disabled');
       break;
     }
 
@@ -465,6 +597,7 @@ export async function* runPlaybook(
           message: `Exiting: reached max loops (${playbook.maxLoops})`,
         };
       }
+      createFinalLoopEntry(`Reached max loop limit (${playbook.maxLoops})`);
       break;
     }
 
@@ -508,6 +641,7 @@ export async function* runPlaybook(
             message: 'Exiting: all non-reset documents have 0 remaining tasks',
           };
         }
+        createFinalLoopEntry('All tasks completed');
         break;
       }
     } else {
@@ -520,6 +654,7 @@ export async function* runPlaybook(
           message: 'Exiting: ALL documents have resetOnCompletion=true (loop requires at least one non-reset doc to drive iterations)',
         };
       }
+      createFinalLoopEntry('All documents have reset-on-completion');
       break;
     }
 
@@ -533,6 +668,7 @@ export async function* runPlaybook(
           message: 'Exiting: no tasks were processed this iteration (safety check)',
         };
       }
+      createFinalLoopEntry('No tasks processed this iteration');
       break;
     }
 
@@ -594,6 +730,12 @@ export async function* runPlaybook(
 
     loopIteration++;
   }
+
+  // Unregister CLI activity - session is no longer busy
+  unregisterCliActivity(session.id);
+
+  // Add total Auto Run summary (only if looping was used)
+  createAutoRunSummary();
 
   // Emit complete event
   yield {

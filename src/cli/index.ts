@@ -64,6 +64,7 @@ program
   .option('--json', 'Output as JSON lines (for scripting)')
   .option('--debug', 'Show detailed debug output for troubleshooting')
   .option('--verbose', 'Show full prompt sent to agent on each iteration')
+  .option('--wait', 'Wait for agent to become available if busy')
   .action(runPlaybook);
 
 program.parse();

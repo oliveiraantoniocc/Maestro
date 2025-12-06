@@ -1345,7 +1345,7 @@ export function SessionList(props: SessionListProps) {
                             title={
                               session.toolType === 'claude' && !session.claudeSessionId ? 'No active Claude session' :
                               session.state === 'idle' ? 'Ready and waiting' :
-                              session.state === 'busy' ? 'Agent is thinking' :
+                              session.state === 'busy' ? (session.cliActivity ? `CLI: Running playbook "${session.cliActivity.playbookName}"` : 'Agent is thinking') :
                               session.state === 'connecting' ? 'Attempting to establish connection' :
                               session.state === 'error' ? 'No connection with agent' :
                               'Waiting for input'
@@ -1633,7 +1633,7 @@ export function SessionList(props: SessionListProps) {
                               title={
                                 session.toolType === 'claude' && !session.claudeSessionId ? 'No active Claude session' :
                                 session.state === 'idle' ? 'Ready and waiting' :
-                                session.state === 'busy' ? 'Agent is thinking' :
+                                session.state === 'busy' ? (session.cliActivity ? `CLI: Running playbook "${session.cliActivity.playbookName}"` : 'Agent is thinking') :
                                 session.state === 'connecting' ? 'Attempting to establish connection' :
                                 session.state === 'error' ? 'No connection with agent' :
                                 'Waiting for input'

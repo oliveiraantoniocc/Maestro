@@ -333,6 +333,12 @@ export interface Session {
   batchRunnerPrompt?: string;
   // Timestamp when the batch runner prompt was last modified
   batchRunnerPromptModifiedAt?: number;
+  // CLI activity - present when CLI is running a playbook on this session
+  cliActivity?: {
+    playbookId: string;
+    playbookName: string;
+    startedAt: number;
+  };
 
   // Tab management for AI mode (multi-tab Claude Code sessions)
   // Each tab represents a separate Claude Code conversation

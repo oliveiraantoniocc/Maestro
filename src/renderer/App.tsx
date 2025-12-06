@@ -1769,6 +1769,56 @@ export default function MaestroConsole() {
     return unsubscribe;
   }, []);
 
+  // Listen for CLI activity changes (when CLI is running playbooks)
+  // Update session states to show busy when CLI is active
+  useEffect(() => {
+    const checkCliActivity = async () => {
+      try {
+        const activities = await window.maestro.cli.getActivity();
+        setSessions(prev => prev.map(session => {
+          const cliActivity = activities.find(a => a.sessionId === session.id);
+          if (cliActivity) {
+            // CLI is running a playbook on this session - mark as busy
+            // Only update if not already busy (to preserve aiPid-based busy state)
+            if (session.state !== 'busy') {
+              return {
+                ...session,
+                state: 'busy' as const,
+                cliActivity: {
+                  playbookId: cliActivity.playbookId,
+                  playbookName: cliActivity.playbookName,
+                  startedAt: cliActivity.startedAt,
+                },
+              };
+            }
+          } else if (session.cliActivity) {
+            // CLI activity ended - set back to idle (unless process is still running)
+            if (!session.aiPid) {
+              return {
+                ...session,
+                state: 'idle' as const,
+                cliActivity: undefined,
+              };
+            }
+          }
+          return session;
+        }));
+      } catch (error) {
+        console.error('[CLI Activity] Error checking activity:', error);
+      }
+    };
+
+    // Check immediately on mount
+    checkCliActivity();
+
+    // Listen for changes
+    const unsubscribe = window.maestro.cli.onActivityChange(() => {
+      console.log('[CLI Activity] Activity change detected');
+      checkCliActivity();
+    });
+    return unsubscribe;
+  }, []);
+
   // Combine built-in slash commands with custom AI commands for autocomplete
   // Filter out isSystemCommand entries since those are already in slashCommands with execute functions
   const allSlashCommands = useMemo(() => {
@@ -3276,6 +3326,10 @@ export default function MaestroConsole() {
           ctx.handleSetLightboxImage(ctx.stagedImages[0], ctx.stagedImages);
         }
       }
+      else if (ctx.isShortcut(e, 'toggleTabStar')) {
+        e.preventDefault();
+        ctx.toggleTabStar();
+      }
       else if (ctx.isShortcut(e, 'focusInput')) {
         e.preventDefault();
         ctx.setActiveFocus('main');
@@ -3847,6 +3901,32 @@ export default function MaestroConsole() {
     setShowUnreadOnly(prev => !prev);
   }, [showUnreadOnly, activeSession]);
 
+  // Toggle star on the current active tab
+  const toggleTabStar = useCallback(() => {
+    if (!activeSession) return;
+    const tab = getActiveTab(activeSession);
+    if (!tab) return;
+
+    const newStarred = !tab.starred;
+    setSessions(prev => prev.map(s => {
+      if (s.id !== activeSession.id) return s;
+      // Persist starred status to Claude session metadata (async, fire and forget)
+      if (tab.claudeSessionId) {
+        window.maestro.claude.updateSessionStarred(
+          s.cwd,
+          tab.claudeSessionId,
+          newStarred
+        ).catch(err => console.error('Failed to persist tab starred:', err));
+      }
+      return {
+        ...s,
+        aiTabs: s.aiTabs.map(t =>
+          t.id === tab.id ? { ...t, starred: newStarred } : t
+        )
+      };
+    }));
+  }, [activeSession]);
+
   // Toggle global live mode (enables web interface for all sessions)
   const toggleGlobalLive = async () => {
     try {
@@ -3947,7 +4027,8 @@ export default function MaestroConsole() {
     setSessions, createTab, closeTab, reopenClosedTab, getActiveTab, setRenameTabId, setRenameTabInitialName,
     setRenameTabModalOpen, navigateToNextTab, navigateToPrevTab, navigateToTabByIndex, navigateToLastTab,
     setFileTreeFilterOpen, isShortcut, isTabShortcut, handleNavBack, handleNavForward, toggleUnreadFilter,
-    setTabSwitcherOpen, showUnreadOnly, stagedImages, handleSetLightboxImage, setMarkdownRawMode
+    setTabSwitcherOpen, showUnreadOnly, stagedImages, handleSetLightboxImage, setMarkdownRawMode,
+    toggleTabStar
   };
 
   const toggleGroup = (groupId: string) => {
