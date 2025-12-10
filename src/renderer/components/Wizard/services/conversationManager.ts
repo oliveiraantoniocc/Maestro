@@ -6,7 +6,7 @@
  * and conversation state management.
  */
 
-import type { ToolType } from '../../../types';
+import type { ToolType, LogEntry } from '../../../types';
 import type { WizardMessage } from '../WizardContext';
 import {
   generateSystemPrompt,
@@ -506,3 +506,73 @@ export function shouldAutoProceed(response: ParsedResponse): boolean {
     isReadyToProceed(response.structured)
   );
 }
+
+/**
+ * Generate a unique log entry ID
+ */
+function generateLogEntryId(): string {
+  return `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
+ * Convert wizard conversation history to session log entries.
+ *
+ * This function is used when the wizard completes to populate the
+ * "Project Discovery" tab's conversation history with the wizard's
+ * project discovery conversation.
+ *
+ * @param messages The wizard's conversation history (WizardMessage[])
+ * @returns LogEntry[] suitable for populating an AITab's logs
+ */
+export function convertWizardMessagesToLogEntries(messages: WizardMessage[]): LogEntry[] {
+  return messages.map((msg) => {
+    const logEntry: LogEntry = {
+      id: generateLogEntryId(),
+      timestamp: msg.timestamp,
+      source: msg.role === 'user' ? 'user' : msg.role === 'assistant' ? 'ai' : 'system',
+      text: msg.content,
+    };
+
+    // Mark user messages as delivered (they were successfully sent during wizard)
+    if (msg.role === 'user') {
+      logEntry.delivered = true;
+    }
+
+    return logEntry;
+  });
+}
+
+/**
+ * Create initial log entries for a Project Discovery tab.
+ *
+ * This prepends a system message indicating the conversation was from the
+ * wizard setup, then includes the full conversation history.
+ *
+ * @param messages The wizard's conversation history
+ * @param projectName The project name for the header message
+ * @returns LogEntry[] with header and conversation
+ */
+export function createProjectDiscoveryLogs(
+  messages: WizardMessage[],
+  projectName: string
+): LogEntry[] {
+  const logs: LogEntry[] = [];
+
+  // Add a system message to indicate this is from the wizard
+  logs.push({
+    id: generateLogEntryId(),
+    timestamp: Date.now(),
+    source: 'system',
+    text: `📋 Project Discovery conversation from setup wizard for "${projectName || 'your project'}"`,
+  });
+
+  // Add the converted conversation history
+  logs.push(...convertWizardMessagesToLogEntries(messages));
+
+  return logs;
+}
+
+/**
+ * Default name for the Project Discovery tab
+ */
+export const PROJECT_DISCOVERY_TAB_NAME = 'Project Discovery';
