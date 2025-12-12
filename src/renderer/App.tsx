@@ -3034,7 +3034,7 @@ export default function MaestroConsole() {
     if (!bookmarksCollapsed) {
       const bookmarkedSessions = sessions
         .filter(s => s.bookmarked)
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
       result.push(...bookmarkedSessions);
     }
 

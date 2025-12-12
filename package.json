@@ -1,6 +1,6 @@
 {
   "name": "maestro",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Multi-Instance AI Coding Console - Unified IDE for managing multiple AI coding assistants",
   "main": "dist/main/index.js",
   "author": {

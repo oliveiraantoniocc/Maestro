@@ -848,7 +848,52 @@ export function useSettings(): UseSettingsReturn {
 
       // Merge saved shortcuts with defaults (in case new shortcuts were added)
       if (savedShortcuts !== undefined) {
-        setShortcutsState({ ...DEFAULT_SHORTCUTS, ...savedShortcuts });
+        // Migration: Fix shortcuts that were recorded with macOS Alt+key special characters
+        // On macOS, Alt+L produces '¬', Alt+P produces 'π', etc. These should be 'l', 'p', etc.
+        const macAltCharMap: Record<string, string> = {
+          '¬': 'l',  // Alt+L
+          'π': 'p',  // Alt+P
+          '†': 't',  // Alt+T
+          '∫': 'b',  // Alt+B
+          '∂': 'd',  // Alt+D
+          'ƒ': 'f',  // Alt+F
+          '©': 'g',  // Alt+G
+          '˙': 'h',  // Alt+H
+          'ˆ': 'i',  // Alt+I (circumflex)
+          '∆': 'j',  // Alt+J
+          '˚': 'k',  // Alt+K
+          '¯': 'm',  // Alt+M (macron, though some keyboards differ)
+          '˜': 'n',  // Alt+N
+          'ø': 'o',  // Alt+O
+          '®': 'r',  // Alt+R
+          'ß': 's',  // Alt+S
+          '√': 'v',  // Alt+V
+          '∑': 'w',  // Alt+W
+          '≈': 'x',  // Alt+X
+          '¥': 'y',  // Alt+Y
+          'Ω': 'z',  // Alt+Z
+        };
+
+        const migratedShortcuts: Record<string, Shortcut> = {};
+        let needsMigration = false;
+
+        for (const [id, shortcut] of Object.entries(savedShortcuts as Record<string, Shortcut>)) {
+          const migratedKeys = shortcut.keys.map(key => {
+            if (macAltCharMap[key]) {
+              needsMigration = true;
+              return macAltCharMap[key];
+            }
+            return key;
+          });
+          migratedShortcuts[id] = { ...shortcut, keys: migratedKeys };
+        }
+
+        // If migration was needed, save the corrected shortcuts
+        if (needsMigration) {
+          window.maestro.settings.set('shortcuts', migratedShortcuts);
+        }
+
+        setShortcutsState({ ...DEFAULT_SHORTCUTS, ...migratedShortcuts });
       }
 
       // Merge saved AI commands with defaults (ensure built-in commands always exist)

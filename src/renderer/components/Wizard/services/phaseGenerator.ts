@@ -828,10 +828,12 @@ class PhaseGenerator {
       }
 
       // Read each .md file
-      for (const filename of listResult.files) {
-        if (!filename.endsWith('.md')) continue;
+      // Note: listDocs returns filenames WITHOUT the .md extension (see main/index.ts autorun:listDocs)
+      // We need to add it back when reading and for the final filename
+      for (const fileBaseName of listResult.files) {
+        const filename = fileBaseName.endsWith('.md') ? fileBaseName : `${fileBaseName}.md`;
 
-        const readResult = await window.maestro.autorun.readDoc(autoRunPath, filename);
+        const readResult = await window.maestro.autorun.readDoc(autoRunPath, fileBaseName);
         if (readResult.success && readResult.content) {
           // Extract phase number from filename
           const phaseMatch = filename.match(/Phase-(\d+)/i);

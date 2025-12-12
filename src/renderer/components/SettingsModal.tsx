@@ -436,7 +436,22 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
     if (e.altKey) keys.push('Alt');
     if (e.shiftKey) keys.push('Shift');
     if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return;
-    keys.push(e.key);
+
+    // On macOS, Alt+letter produces special characters (e.g., Alt+L = ¬, Alt+P = π)
+    // Use e.code to get the physical key name when Alt is pressed
+    let mainKey = e.key;
+    if (e.altKey && e.code) {
+      // e.code is like 'KeyL', 'KeyP', 'Digit1', etc.
+      if (e.code.startsWith('Key')) {
+        mainKey = e.code.replace('Key', '').toLowerCase();
+      } else if (e.code.startsWith('Digit')) {
+        mainKey = e.code.replace('Digit', '');
+      } else {
+        // For other keys like Arrow keys, use as-is
+        mainKey = e.key;
+      }
+    }
+    keys.push(mainKey);
     props.setShortcuts({
       ...props.shortcuts,
       [actionId]: { ...props.shortcuts[actionId], keys }
