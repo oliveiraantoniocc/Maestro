@@ -7002,6 +7002,8 @@ export default function MaestroConsole() {
             toggleGlobalLive={toggleGlobalLive}
             bookmarksCollapsed={bookmarksCollapsed}
             setBookmarksCollapsed={setBookmarksCollapsed}
+            ungroupedCollapsed={settings.ungroupedCollapsed}
+            setUngroupedCollapsed={settings.setUngroupedCollapsed}
             setActiveFocus={setActiveFocus}
             setActiveSessionId={setActiveSessionId}
             setLeftSidebarOpen={setLeftSidebarOpen}

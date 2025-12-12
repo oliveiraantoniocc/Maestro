@@ -180,6 +180,10 @@ export interface UseSettingsReturn {
   acknowledgeBadge: (level: number) => void;
   getUnacknowledgedBadgeLevel: () => number | null;
 
+  // UI collapse states (persistent)
+  ungroupedCollapsed: boolean;
+  setUngroupedCollapsed: (value: boolean) => void;
+
   // Onboarding settings
   wizardCompleted: boolean;
   setWizardCompleted: (value: boolean) => void;
@@ -271,6 +275,9 @@ export function useSettings(): UseSettingsReturn {
 
   // Auto-run Stats (persistent)
   const [autoRunStats, setAutoRunStatsState] = useState<AutoRunStats>(DEFAULT_AUTO_RUN_STATS);
+
+  // UI collapse states (persistent)
+  const [ungroupedCollapsed, setUngroupedCollapsedState] = useState(false);
 
   // Onboarding settings (persistent)
   const [wizardCompleted, setWizardCompletedState] = useState(false);
@@ -602,6 +609,12 @@ export function useSettings(): UseSettingsReturn {
     return null;
   }, [autoRunStats.lastAcknowledgedBadgeLevel, autoRunStats.currentBadgeLevel]);
 
+  // UI collapse state setters
+  const setUngroupedCollapsed = useCallback((value: boolean) => {
+    setUngroupedCollapsedState(value);
+    window.maestro.settings.set('ungroupedCollapsed', value);
+  }, []);
+
   // Onboarding setters
   const setWizardCompleted = useCallback((value: boolean) => {
     setWizardCompletedState(value);
@@ -813,6 +826,7 @@ export function useSettings(): UseSettingsReturn {
       const savedCustomAICommands = await window.maestro.settings.get('customAICommands');
       const savedGlobalStats = await window.maestro.settings.get('globalStats');
       const savedAutoRunStats = await window.maestro.settings.get('autoRunStats');
+      const savedUngroupedCollapsed = await window.maestro.settings.get('ungroupedCollapsed');
       const savedWizardCompleted = await window.maestro.settings.get('wizardCompleted');
       const savedTourCompleted = await window.maestro.settings.get('tourCompleted');
       const savedFirstAutoRunCompleted = await window.maestro.settings.get('firstAutoRunCompleted');
@@ -924,6 +938,9 @@ export function useSettings(): UseSettingsReturn {
       }
 
       // Load onboarding settings
+      // UI collapse states
+      if (savedUngroupedCollapsed !== undefined) setUngroupedCollapsedState(savedUngroupedCollapsed);
+
       if (savedWizardCompleted !== undefined) setWizardCompletedState(savedWizardCompleted);
       if (savedTourCompleted !== undefined) setTourCompletedState(savedTourCompleted);
       if (savedFirstAutoRunCompleted !== undefined) setFirstAutoRunCompletedState(savedFirstAutoRunCompleted);
@@ -1015,6 +1032,8 @@ export function useSettings(): UseSettingsReturn {
     updateAutoRunProgress,
     acknowledgeBadge,
     getUnacknowledgedBadgeLevel,
+    ungroupedCollapsed,
+    setUngroupedCollapsed,
     wizardCompleted,
     setWizardCompleted,
     tourCompleted,
@@ -1064,6 +1083,7 @@ export function useSettings(): UseSettingsReturn {
     customAICommands,
     globalStats,
     autoRunStats,
+    ungroupedCollapsed,
     wizardCompleted,
     tourCompleted,
     firstAutoRunCompleted,
@@ -1104,6 +1124,7 @@ export function useSettings(): UseSettingsReturn {
     updateAutoRunProgress,
     acknowledgeBadge,
     getUnacknowledgedBadgeLevel,
+    setUngroupedCollapsed,
     setWizardCompleted,
     setTourCompleted,
     setFirstAutoRunCompleted,

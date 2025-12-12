@@ -1,6 +1,7 @@
 # Maestro
 
 [![Made with Maestro](docs/assets/made-with-maestro.svg)](https://github.com/pedramamini/Maestro)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Us-5865F2?logo=discord&logoColor=white)](https://discord.gg/86crXbGb)
 
 > A unified, highly-responsive developer command center for managing your fleet of AI coding agents.
 

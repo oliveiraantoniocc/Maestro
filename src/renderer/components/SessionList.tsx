@@ -244,6 +244,10 @@ interface SessionListProps {
   bookmarksCollapsed: boolean;
   setBookmarksCollapsed: (collapsed: boolean) => void;
 
+  // Ungrouped folder state (persisted via useSettings)
+  ungroupedCollapsed: boolean;
+  setUngroupedCollapsed: (collapsed: boolean) => void;
+
   // Handlers
   setActiveFocus: (focus: string) => void;
   setActiveSessionId: (id: string) => void;
@@ -300,6 +304,7 @@ export function SessionList(props: SessionListProps) {
     editingSessionId, draggingSessionId, shortcuts,
     isLiveMode, webInterfaceUrl, toggleGlobalLive,
     bookmarksCollapsed, setBookmarksCollapsed,
+    ungroupedCollapsed, setUngroupedCollapsed,
     setActiveFocus, setActiveSessionId, setLeftSidebarOpen, setLeftSidebarWidthState,
     setShortcutsHelpOpen, setSettingsModalOpen, setSettingsTab, setAboutModalOpen, setUpdateCheckModalOpen, setLogViewerOpen, setProcessMonitorOpen, toggleGroup,
     handleDragStart, handleDragOver, handleDropOnGroup, handleDropOnUngrouped,
@@ -316,7 +321,6 @@ export function SessionList(props: SessionListProps) {
 
   const [sessionFilter, setSessionFilter] = useState('');
   const [sessionFilterOpen, setSessionFilterOpen] = useState(false);
-  const [ungroupedCollapsed, setUngroupedCollapsed] = useState(false);
   const [preFilterGroupStates, setPreFilterGroupStates] = useState<Map<string, boolean>>(new Map());
   const [preFilterBookmarksCollapsed, setPreFilterBookmarksCollapsed] = useState<boolean | null>(null);
   // Remember user's preferred states while in filter mode (persists across filter open/close within session)

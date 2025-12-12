@@ -150,6 +150,8 @@ const createDefaultProps = (overrides: Partial<Parameters<typeof SessionList>[0]
   toggleGlobalLive: vi.fn(),
   bookmarksCollapsed: false,
   setBookmarksCollapsed: vi.fn(),
+  ungroupedCollapsed: false,
+  setUngroupedCollapsed: vi.fn(),
   setActiveFocus: vi.fn(),
   setActiveSessionId: vi.fn(),
   setLeftSidebarOpen: vi.fn(),
