@@ -256,4 +256,146 @@ export const helpers = {
       // Ignore cleanup errors
     }
   },
+
+  // ============================================
+  // Auto Run Helpers
+  // ============================================
+
+  /**
+   * Navigate to the Auto Run tab in the right panel
+   */
+  async navigateToAutoRunTab(window: Page): Promise<boolean> {
+    const autoRunTab = window.locator('text=Auto Run');
+    if (await autoRunTab.count() > 0) {
+      await autoRunTab.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Switch Auto Run to edit mode
+   */
+  async switchToEditMode(window: Page): Promise<boolean> {
+    const editButton = window.locator('button').filter({ hasText: 'Edit' });
+    if (await editButton.count() > 0 && await editButton.isVisible()) {
+      await editButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Switch Auto Run to preview mode
+   */
+  async switchToPreviewMode(window: Page): Promise<boolean> {
+    const previewButton = window.locator('button').filter({ hasText: 'Preview' });
+    if (await previewButton.count() > 0 && await previewButton.isVisible()) {
+      await previewButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Get the Auto Run textarea element
+   */
+  getAutoRunTextarea(window: Page) {
+    return window.locator('textarea');
+  },
+
+  /**
+   * Type content into the Auto Run editor
+   */
+  async typeInAutoRunEditor(window: Page, content: string): Promise<boolean> {
+    const textarea = window.locator('textarea');
+    if (await textarea.count() > 0) {
+      await textarea.fill(content);
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Get current content from Auto Run editor
+   */
+  async getAutoRunContent(window: Page): Promise<string | null> {
+    const textarea = window.locator('textarea');
+    if (await textarea.count() > 0) {
+      return await textarea.inputValue();
+    }
+    return null;
+  },
+
+  /**
+   * Open the Auto Run expanded modal
+   */
+  async openExpandedModal(window: Page): Promise<boolean> {
+    const expandButton = window.locator('button[title*="Expand"]').or(
+      window.locator('button[title*="full screen"]')
+    );
+    if (await expandButton.count() > 0) {
+      await expandButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Check if Auto Run is in edit mode
+   */
+  async isInEditMode(window: Page): Promise<boolean> {
+    const textarea = window.locator('textarea');
+    return await textarea.count() > 0 && await textarea.isVisible();
+  },
+
+  /**
+   * Open search in Auto Run
+   */
+  async openAutoRunSearch(window: Page): Promise<void> {
+    await window.keyboard.press('Meta+F');
+  },
+
+  /**
+   * Create an Auto Run test folder with sample documents
+   */
+  createAutoRunTestFolder(basePath: string): string {
+    const autoRunFolder = path.join(basePath, 'Auto Run Docs');
+    fs.mkdirSync(autoRunFolder, { recursive: true });
+
+    // Create sample documents
+    fs.writeFileSync(
+      path.join(autoRunFolder, 'Phase 1.md'),
+      `# Phase 1: Setup
+
+## Tasks
+
+- [ ] Task 1: Initialize project
+- [ ] Task 2: Configure environment
+- [x] Task 3: Review documentation
+
+## Notes
+
+Sample content for testing Auto Run editing.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(autoRunFolder, 'Phase 2.md'),
+      `# Phase 2: Implementation
+
+## Tasks
+
+- [ ] Build feature A
+- [ ] Build feature B
+- [ ] Write tests
+
+## Details
+
+More content for the second phase.
+`
+    );
+
+    return autoRunFolder;
+  },
 };
