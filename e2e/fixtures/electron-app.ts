@@ -398,4 +398,155 @@ More content for the second phase.
 
     return autoRunFolder;
   },
+
+  // ============================================
+  // Batch Processing Helpers
+  // ============================================
+
+  /**
+   * Get the Run button for batch processing
+   */
+  getRunButton(window: Page) {
+    return window.locator('button').filter({ hasText: /^run$/i });
+  },
+
+  /**
+   * Get the Stop button for batch processing
+   */
+  getStopButton(window: Page) {
+    return window.locator('button').filter({ hasText: /stop/i });
+  },
+
+  /**
+   * Click the Run button to open batch runner modal
+   */
+  async clickRunButton(window: Page): Promise<boolean> {
+    const runButton = window.locator('button').filter({ hasText: /^run$/i });
+    if (await runButton.count() > 0 && await runButton.first().isEnabled()) {
+      await runButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Click the Stop button to halt batch processing
+   */
+  async clickStopButton(window: Page): Promise<boolean> {
+    const stopButton = window.locator('button').filter({ hasText: /stop/i });
+    if (await stopButton.count() > 0 && await stopButton.first().isEnabled()) {
+      await stopButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Wait for batch runner modal to be visible
+   */
+  async waitForBatchRunnerModal(window: Page): Promise<void> {
+    await window.waitForSelector('text=Auto Run Configuration', { timeout: 5000 });
+  },
+
+  /**
+   * Click the Go button in batch runner modal to start processing
+   */
+  async clickGoButton(window: Page): Promise<boolean> {
+    const goButton = window.locator('button').filter({ hasText: 'Go' });
+    if (await goButton.count() > 0 && await goButton.first().isEnabled()) {
+      await goButton.first().click();
+      return true;
+    }
+    return false;
+  },
+
+  /**
+   * Check if batch run is currently active
+   */
+  async isBatchRunActive(window: Page): Promise<boolean> {
+    // If Stop button is visible, batch run is active
+    const stopButton = window.locator('button').filter({ hasText: /stop/i });
+    return (await stopButton.count() > 0) && await stopButton.first().isVisible();
+  },
+
+  /**
+   * Check if textarea is in locked (readonly) state
+   */
+  async isTextareaLocked(window: Page): Promise<boolean> {
+    const textarea = window.locator('textarea');
+    if (await textarea.count() > 0) {
+      const readonly = await textarea.first().getAttribute('readonly');
+      return readonly !== null;
+    }
+    return false;
+  },
+
+  /**
+   * Get task count text from Auto Run panel
+   */
+  async getTaskCountText(window: Page): Promise<string | null> {
+    const taskCount = window.locator('text=/\\d+ of \\d+ task/i');
+    if (await taskCount.count() > 0) {
+      return await taskCount.first().textContent();
+    }
+    return null;
+  },
+
+  /**
+   * Create an Auto Run test folder with batch processing test documents
+   */
+  createBatchTestFolder(basePath: string): string {
+    const autoRunFolder = path.join(basePath, 'Auto Run Docs');
+    fs.mkdirSync(autoRunFolder, { recursive: true });
+
+    // Create documents with varying task counts
+    fs.writeFileSync(
+      path.join(autoRunFolder, 'Phase 1.md'),
+      `# Phase 1: Setup
+
+## Tasks
+
+- [ ] Task 1: Initialize project structure
+- [ ] Task 2: Set up configuration files
+- [ ] Task 3: Create initial documentation
+
+## Notes
+
+Test document for batch processing.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(autoRunFolder, 'Phase 2.md'),
+      `# Phase 2: Implementation
+
+## Tasks
+
+- [ ] Task 4: Build core functionality
+- [ ] Task 5: Add unit tests
+- [ ] Task 6: Implement error handling
+
+## Details
+
+Second phase document.
+`
+    );
+
+    fs.writeFileSync(
+      path.join(autoRunFolder, 'Completed.md'),
+      `# Completed Tasks
+
+## Tasks
+
+- [x] Done task 1
+- [x] Done task 2
+
+## Summary
+
+All tasks complete in this document.
+`
+    );
+
+    return autoRunFolder;
+  },
 };
