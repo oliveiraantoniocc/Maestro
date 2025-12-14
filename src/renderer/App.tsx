@@ -31,7 +31,7 @@ import { AutoRunSetupModal } from './components/AutoRunSetupModal';
 import { DebugWizardModal } from './components/DebugWizardModal';
 import { MaestroWizard, useWizard, WizardResumeModal, SerializableWizardState, AUTO_RUN_FOLDER_NAME } from './components/Wizard';
 import { TourOverlay } from './components/Wizard/tour';
-import { CONDUCTOR_BADGES } from './constants/conductorBadges';
+import { CONDUCTOR_BADGES, getBadgeForTime } from './constants/conductorBadges';
 import { EmptyStateView } from './components/EmptyStateView';
 
 // Import custom hooks
@@ -2002,9 +2002,7 @@ export default function MaestroConsole() {
           const updatedCumulativeTimeMs = autoRunStats.cumulativeTimeMs + info.elapsedTimeMs;
           const updatedTotalRuns = autoRunStats.totalRuns + 1;
           const updatedLongestRunMs = Math.max(autoRunStats.longestRunMs || 0, info.elapsedTimeMs);
-          const updatedBadge = CONDUCTOR_BADGES.find(b =>
-            b.thresholdMs <= updatedCumulativeTimeMs
-          );
+          const updatedBadge = getBadgeForTime(updatedCumulativeTimeMs);
           const updatedBadgeLevel = updatedBadge?.level || 0;
           const updatedBadgeName = updatedBadge?.name || 'No Badge Yet';
 
