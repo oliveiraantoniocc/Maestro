@@ -1,5 +1,7 @@
 # Contributing to Maestro
 
+NOTE: The project is currently changing rapidly, there's a high likelihood that PRs will be out of sync with latest code versions and may be hard to rebase.
+
 Thank you for your interest in contributing to Maestro! This document provides guidelines, setup instructions, and practical guidance for developers.
 
 For architecture details, see [ARCHITECTURE.md](ARCHITECTURE.md). For quick reference while coding, see [CLAUDE.md](CLAUDE.md).
