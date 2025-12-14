@@ -638,6 +638,11 @@ To access Maestro from outside your local network (e.g., on mobile data or from 
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture details, and contribution guidelines.
 
+## Contributors
+
+- [@pedramamini](https://github.com/pedramamini) - Creator and maintainer
+- [@mattjay](https://github.com/mattjay) - Contributor and tester
+
 ## License
 
 [AGPL-3.0 License](LICENSE)
