@@ -2016,21 +2016,25 @@ export default function MaestroConsole() {
             longestRunDate = new Date(autoRunStats.longestRunTimestamp).toISOString().split('T')[0];
           }
 
-          // Submit to leaderboard in background
-          window.maestro.leaderboard.submit({
-            email: leaderboardRegistration.email,
-            displayName: leaderboardRegistration.displayName,
-            githubUsername: leaderboardRegistration.githubUsername,
-            twitterHandle: leaderboardRegistration.twitterHandle,
-            linkedinHandle: leaderboardRegistration.linkedinHandle,
-            badgeLevel: updatedBadgeLevel,
-            badgeName: updatedBadgeName,
-            cumulativeTimeMs: updatedCumulativeTimeMs,
-            totalRuns: updatedTotalRuns,
-            longestRunMs: updatedLongestRunMs,
-            longestRunDate,
-            theme: activeThemeId,
-          }).then(result => {
+          // Submit to leaderboard in background (only if we have an auth token)
+          if (!leaderboardRegistration.authToken) {
+            console.warn('Leaderboard submission skipped: no auth token');
+          } else {
+            window.maestro.leaderboard.submit({
+              email: leaderboardRegistration.email,
+              displayName: leaderboardRegistration.displayName,
+              githubUsername: leaderboardRegistration.githubUsername,
+              twitterHandle: leaderboardRegistration.twitterHandle,
+              linkedinHandle: leaderboardRegistration.linkedinHandle,
+              badgeLevel: updatedBadgeLevel,
+              badgeName: updatedBadgeName,
+              cumulativeTimeMs: updatedCumulativeTimeMs,
+              totalRuns: updatedTotalRuns,
+              longestRunMs: updatedLongestRunMs,
+              longestRunDate,
+              theme: activeThemeId,
+              authToken: leaderboardRegistration.authToken,
+            }).then(result => {
             if (result.success) {
               // Update last submission timestamp
               setLeaderboardRegistration({
@@ -2073,9 +2077,10 @@ export default function MaestroConsole() {
               }
             }
             // Silent failure - don't bother the user if submission fails
-          }).catch(() => {
-            // Silent failure - leaderboard submission is not critical
-          });
+            }).catch(() => {
+              // Silent failure - leaderboard submission is not critical
+            });
+          }
         }
       }
     },
