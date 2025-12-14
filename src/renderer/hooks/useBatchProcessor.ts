@@ -36,7 +36,10 @@ const DEFAULT_BATCH_STATE: BatchRunState = {
   completedTasks: 0,
   currentTaskIndex: 0,
   originalContent: '',
-  sessionIds: []
+  sessionIds: [],
+  // Time tracking (excludes sleep/suspend time)
+  accumulatedElapsedMs: 0,
+  lastActiveTimestamp: undefined
 };
 
 interface BatchCompleteInfo {
@@ -249,6 +252,11 @@ export function useBatchProcessor({
   const sessionsRef = useRef(sessions);
   sessionsRef.current = sessions;
 
+  // Visibility-based time tracking refs (per session)
+  // Tracks accumulated time and last active timestamp for accurate elapsed time
+  const accumulatedTimeRefs = useRef<Record<string, number>>({});
+  const lastActiveTimestampRefs = useRef<Record<string, number | null>>({});
+
   // Helper to get batch state for a session
   const getBatchState = useCallback((sessionId: string): BatchRunState => {
     return batchRunStates[sessionId] || DEFAULT_BATCH_STATE;
@@ -284,6 +292,54 @@ export function useBatchProcessor({
         window.maestro.web.broadcastAutoRunState(sessionId, null);
       }
     });
+  }, [batchRunStates]);
+
+  // Helper to get current accumulated elapsed time for a session (visibility-aware)
+  const getAccumulatedElapsedMs = useCallback((sessionId: string): number => {
+    const accumulated = accumulatedTimeRefs.current[sessionId] || 0;
+    const lastActive = lastActiveTimestampRefs.current[sessionId];
+    if (lastActive !== null && lastActive !== undefined && !document.hidden) {
+      // Add time since last active timestamp
+      return accumulated + (Date.now() - lastActive);
+    }
+    return accumulated;
+  }, []);
+
+  // Visibility change handler to pause/resume time tracking
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const now = Date.now();
+
+      // Update time tracking for all running batch sessions
+      Object.entries(batchRunStates).forEach(([sessionId, state]) => {
+        if (!state.isRunning) return;
+
+        if (document.hidden) {
+          // Going hidden: accumulate the time since last active timestamp
+          const lastActive = lastActiveTimestampRefs.current[sessionId];
+          if (lastActive !== null && lastActive !== undefined) {
+            accumulatedTimeRefs.current[sessionId] = (accumulatedTimeRefs.current[sessionId] || 0) + (now - lastActive);
+            lastActiveTimestampRefs.current[sessionId] = null;
+          }
+        } else {
+          // Becoming visible: reset the last active timestamp to now
+          lastActiveTimestampRefs.current[sessionId] = now;
+        }
+
+        // Update batch state with new accumulated time
+        setBatchRunStates(prev => ({
+          ...prev,
+          [sessionId]: {
+            ...prev[sessionId],
+            accumulatedElapsedMs: accumulatedTimeRefs.current[sessionId] || 0,
+            lastActiveTimestamp: lastActiveTimestampRefs.current[sessionId] ?? undefined
+          }
+        }));
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [batchRunStates]);
 
   /**
@@ -342,6 +398,10 @@ ${docList}
 
     // Track batch start time for completion notification
     const batchStartTime = Date.now();
+
+    // Initialize visibility-based time tracking for this session
+    accumulatedTimeRefs.current[sessionId] = 0;
+    lastActiveTimestampRefs.current[sessionId] = batchStartTime;
 
     // Reset stop flag for this session
     stopRequestedRefs.current[sessionId] = false;
@@ -464,7 +524,10 @@ ${docList}
         originalContent: '',
         customPrompt: prompt !== '' ? prompt : undefined,
         sessionIds: [],
-        startTime: batchStartTime
+        startTime: batchStartTime,
+        // Time tracking (excludes sleep/suspend time)
+        accumulatedElapsedMs: 0,
+        lastActiveTimestamp: batchStartTime
       }
     }));
 
@@ -1061,7 +1124,12 @@ ${docList}
     }
 
     // Add final Auto Run summary entry (no sessionId - this is a standalone synopsis)
-    const totalElapsedMs = Date.now() - batchStartTime;
+    // Calculate visibility-aware elapsed time (excludes time when laptop was sleeping/suspended)
+    const finalAccumulatedTime = accumulatedTimeRefs.current[sessionId] || 0;
+    const finalLastActive = lastActiveTimestampRefs.current[sessionId];
+    const totalElapsedMs = finalLastActive !== null && finalLastActive !== undefined && !document.hidden
+      ? finalAccumulatedTime + (Date.now() - finalLastActive)
+      : finalAccumulatedTime;
     const loopsCompleted = loopEnabled ? loopIteration + 1 : 1;
     const statusText = stalledDueToNoProgress ? 'stalled' : wasStopped ? 'stopped' : 'completed';
 
@@ -1153,9 +1221,13 @@ ${docList}
         completedTasks: totalCompletedTasks,
         totalTasks: initialTotalTasks,
         wasStopped,
-        elapsedTimeMs: Date.now() - batchStartTime
+        elapsedTimeMs: totalElapsedMs
       });
     }
+
+    // Clean up time tracking refs
+    delete accumulatedTimeRefs.current[sessionId];
+    delete lastActiveTimestampRefs.current[sessionId];
   }, [onUpdateSession, onSpawnAgent, onSpawnSynopsis, onAddHistoryEntry, onComplete, onPRResult, audioFeedbackEnabled, audioFeedbackCommand]);
 
   /**
