@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback, memo } from 'react';
 import { Activity, X, ChevronDown, ChevronUp, Trash2, Copy, Volume2, Square, Check, ArrowDown, Eye, FileText, RotateCcw } from 'lucide-react';
 import type { Session, Theme, LogEntry } from '../types';
+import type { FileNode } from '../hooks/useFileExplorer';
 import Convert from 'ansi-to-html';
 import DOMPurify from 'dompurify';
 import { useLayerStack } from '../contexts/LayerStackContext';
@@ -62,6 +63,10 @@ interface LogItemProps {
   onToggleMarkdownEditMode: () => void;
   // Replay message callback (AI mode only)
   onReplayMessage?: (text: string, images?: string[]) => void;
+  // File linking support
+  fileTree?: FileNode[];
+  cwd?: string;
+  onFileClick?: (path: string) => void;
 }
 
 const LogItemComponent = memo(({
@@ -97,6 +102,9 @@ const LogItemComponent = memo(({
   markdownEditMode,
   onToggleMarkdownEditMode,
   onReplayMessage,
+  fileTree,
+  cwd,
+  onFileClick,
 }: LogItemProps) => {
   // Ref for the log item container - used for scroll-into-view on expand
   const logItemRef = useRef<HTMLDivElement>(null);
@@ -400,6 +408,9 @@ const LogItemComponent = memo(({
                   content={displayText}
                   theme={theme}
                   onCopy={copyToClipboard}
+                  fileTree={fileTree}
+                  cwd={cwd}
+                  onFileClick={onFileClick}
                 />
               ) : (
                 displayText
@@ -476,6 +487,9 @@ const LogItemComponent = memo(({
                   content={filteredText}
                   theme={theme}
                   onCopy={copyToClipboard}
+                  fileTree={fileTree}
+                  cwd={cwd}
+                  onFileClick={onFileClick}
                 />
               ) : (
                 <div>{highlightMatches(filteredText, outputSearchQuery)}</div>
@@ -534,6 +548,9 @@ const LogItemComponent = memo(({
                 content={filteredText}
                 theme={theme}
                 onCopy={copyToClipboard}
+                fileTree={fileTree}
+                cwd={cwd}
+                onFileClick={onFileClick}
               />
             ) : (
               // Plain text mode (strip markdown formatting for readability)
@@ -745,6 +762,9 @@ interface TerminalOutputProps {
   markdownEditMode: boolean; // Whether to show raw markdown or rendered markdown for AI responses
   setMarkdownEditMode: (value: boolean) => void; // Toggle markdown mode
   onReplayMessage?: (text: string, images?: string[]) => void; // Replay a user message
+  fileTree?: FileNode[]; // File tree for linking file references
+  cwd?: string; // Current working directory for proximity-based matching
+  onFileClick?: (path: string) => void; // Callback when a file link is clicked
 }
 
 export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((props, ref) => {
@@ -753,7 +773,8 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
     setOutputSearchOpen, setOutputSearchQuery, setActiveFocus, setLightboxImage,
     inputRef, logsEndRef, maxOutputLines, onDeleteLog, onRemoveQueuedItem, onInterrupt,
     audioFeedbackCommand, onScrollPositionChange, onAtBottomChange, initialScrollTop,
-    markdownEditMode, setMarkdownEditMode, onReplayMessage
+    markdownEditMode, setMarkdownEditMode, onReplayMessage,
+    fileTree, cwd, onFileClick
   } = props;
 
   // Use the forwarded ref if provided, otherwise create a local one
@@ -1410,6 +1431,9 @@ export const TerminalOutput = forwardRef<HTMLDivElement, TerminalOutputProps>((p
             markdownEditMode={markdownEditMode}
             onToggleMarkdownEditMode={toggleMarkdownEditMode}
             onReplayMessage={onReplayMessage}
+            fileTree={fileTree}
+            cwd={cwd}
+            onFileClick={onFileClick}
           />
         ))}
 

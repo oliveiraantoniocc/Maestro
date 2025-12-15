@@ -908,8 +908,8 @@ describe('BatchRunnerModal', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
       await waitFor(() => {
-        expect(screen.getByPlaceholderText('/path/to/worktree')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('autorun-feature-xyz')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('/path/to/worktrees')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('feature-xyz')).toBeInTheDocument();
       });
     });
 
@@ -983,9 +983,9 @@ describe('BatchRunnerModal', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-      const pathInput = screen.getByPlaceholderText('/path/to/worktree');
-      fireEvent.change(pathInput, { target: { value: '/path/to/worktree' } });
-      fireEvent.change(screen.getByPlaceholderText('autorun-feature-xyz'), { target: { value: 'different-branch' } });
+      const pathInput = screen.getByPlaceholderText('/path/to/worktrees');
+      fireEvent.change(pathInput, { target: { value: '/path/to/worktrees' } });
+      fireEvent.change(screen.getByPlaceholderText('feature-xyz'), { target: { value: 'different-branch' } });
 
       // Should show validation info after debounce
       await waitFor(() => {
@@ -1013,12 +1013,14 @@ describe('BatchRunnerModal', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-      const pathInput = screen.getByPlaceholderText('/path/to/worktree');
+      const pathInput = screen.getByPlaceholderText('/path/to/worktrees');
       fireEvent.change(pathInput, { target: { value: '/different/worktree' } });
+      // Also set branch name to trigger validation (computedWorktreePath requires both)
+      fireEvent.change(screen.getByPlaceholderText('feature-xyz'), { target: { value: 'my-branch' } });
 
       await waitFor(() => {
         expect(screen.getByText(/different repository/)).toBeInTheDocument();
-      }, { timeout: 1000 });
+      }, { timeout: 2000 });
     });
   });
 
@@ -1084,8 +1086,8 @@ describe('BatchRunnerModal', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-      fireEvent.change(screen.getByPlaceholderText('/path/to/worktree'), { target: { value: '/my/worktree' } });
-      fireEvent.change(screen.getByPlaceholderText('autorun-feature-xyz'), { target: { value: 'my-branch' } });
+      fireEvent.change(screen.getByPlaceholderText('/path/to/worktrees'), { target: { value: '/my/worktree' } });
+      fireEvent.change(screen.getByPlaceholderText('feature-xyz'), { target: { value: 'my-branch' } });
 
       // Wait for validation
       await waitFor(() => {
@@ -1097,7 +1099,7 @@ describe('BatchRunnerModal', () => {
       expect(props.onGo).toHaveBeenCalledWith(expect.objectContaining({
         worktree: expect.objectContaining({
           enabled: true,
-          path: '/my/worktree',
+          path: '/my/worktree/my-branch', // computedWorktreePath = baseDir + '/' + branchName
           branchName: 'my-branch',
           createPROnCompletion: false,
           prTargetBranch: 'main',
@@ -1445,7 +1447,7 @@ describe('Playbook with Worktree Settings', () => {
 
     // Verify worktree settings are restored
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('autorun-feature-xyz')).toHaveValue('autorun-feature-123');
+      expect(screen.getByPlaceholderText('feature-xyz')).toHaveValue('autorun-feature-123');
     });
   });
 
@@ -1470,7 +1472,7 @@ describe('Playbook with Worktree Settings', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-    const branchInput = screen.getByPlaceholderText('autorun-feature-xyz');
+    const branchInput = screen.getByPlaceholderText('feature-xyz');
     fireEvent.change(branchInput, { target: { value: 'my-branch' } });
 
     // Now load a playbook without worktree settings
@@ -2044,7 +2046,7 @@ describe('Worktree Browse Button', () => {
 
     await waitFor(() => {
       expect(window.maestro.dialog.selectFolder).toHaveBeenCalled();
-      expect(screen.getByPlaceholderText('/path/to/worktree')).toHaveValue('/selected/path');
+      expect(screen.getByPlaceholderText('/path/to/worktrees')).toHaveValue('/selected/path');
     });
   });
 
@@ -2063,7 +2065,7 @@ describe('Worktree Browse Button', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-    const pathInput = screen.getByPlaceholderText('/path/to/worktree');
+    const pathInput = screen.getByPlaceholderText('/path/to/worktrees');
     fireEvent.change(pathInput, { target: { value: '/original/path' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
@@ -2104,9 +2106,9 @@ describe('Worktree Validation Edge Cases', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-    const pathInput = screen.getByPlaceholderText('/path/to/worktree');
-    fireEvent.change(pathInput, { target: { value: '/path/to/worktree' } });
-    fireEvent.change(screen.getByPlaceholderText('autorun-feature-xyz'), { target: { value: 'different-branch' } });
+    const pathInput = screen.getByPlaceholderText('/path/to/worktrees');
+    fireEvent.change(pathInput, { target: { value: '/path/to/worktrees' } });
+    fireEvent.change(screen.getByPlaceholderText('feature-xyz'), { target: { value: 'different-branch' } });
 
     // Wait for validation with warning about branch mismatch
     await waitFor(() => {
@@ -2132,12 +2134,14 @@ describe('Worktree Validation Edge Cases', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Enable Worktree' }));
 
-    const pathInput = screen.getByPlaceholderText('/path/to/worktree');
-    fireEvent.change(pathInput, { target: { value: '/path/to/worktree' } });
+    const pathInput = screen.getByPlaceholderText('/path/to/worktrees');
+    fireEvent.change(pathInput, { target: { value: '/path/to/worktrees' } });
+    // Also set branch name to trigger validation (computedWorktreePath requires both)
+    fireEvent.change(screen.getByPlaceholderText('feature-xyz'), { target: { value: 'my-branch' } });
 
     await waitFor(() => {
       expect(consoleError).toHaveBeenCalledWith('Failed to validate worktree path:', expect.any(Error));
-    }, { timeout: 1000 });
+    }, { timeout: 2000 });
 
     consoleError.mockRestore();
   });

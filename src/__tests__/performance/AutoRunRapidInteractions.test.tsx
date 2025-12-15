@@ -576,13 +576,25 @@ describe('AutoRun Rapid User Interactions Performance', () => {
       const props = createDefaultProps({
         mode: 'preview',
         onModeChange,
+        selectedFile: 'test-doc', // Must match what's in lockedDocuments
         batchRunState: {
           isRunning: true,
           isStopping: false,
-          documents: ['doc1'],
+          documents: ['test-doc'],
+          lockedDocuments: ['test-doc'], // Lock test-doc to match selectedFile
           currentDocumentIndex: 0,
           currentDocTasksTotal: 5,
           currentDocTasksCompleted: 2,
+          totalTasksAcrossAllDocs: 5,
+          completedTasksAcrossAllDocs: 2,
+          loopEnabled: false,
+          loopIteration: 0,
+          folderPath: '/test/folder',
+          worktreeActive: false,
+          totalTasks: 5,
+          completedTasks: 2,
+          currentTaskIndex: 0,
+          originalContent: '',
         } as BatchRunState,
       });
 
@@ -930,9 +942,20 @@ describe('AutoRun Rapid User Interactions Performance', () => {
         isRunning,
         isStopping,
         documents: ['doc1'],
+        lockedDocuments: ['doc1'],
         currentDocumentIndex: 0,
         currentDocTasksTotal: 5,
         currentDocTasksCompleted: 2,
+        totalTasksAcrossAllDocs: 5,
+        completedTasksAcrossAllDocs: 2,
+        loopEnabled: false,
+        loopIteration: 0,
+        folderPath: '/test/folder',
+        worktreeActive: false,
+        totalTasks: 5,
+        completedTasks: 2,
+        currentTaskIndex: 0,
+        originalContent: '',
       });
       const batchStates: (BatchRunState | undefined)[] = [
         undefined,

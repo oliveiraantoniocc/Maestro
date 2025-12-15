@@ -2047,6 +2047,7 @@ export default function MaestroConsole() {
               totalRuns: updatedTotalRuns,
               longestRunMs: updatedLongestRunMs,
               longestRunDate,
+              currentRunMs: info.elapsedTimeMs,
               theme: activeThemeId,
               authToken: leaderboardRegistration.authToken,
             }).then(result => {
@@ -5257,6 +5258,23 @@ export default function MaestroConsole() {
           }
           // Use setTimeout to ensure state updates are applied before processing
           setTimeout(() => processInput(text), 0);
+        }}
+        fileTree={activeSession?.fileTree}
+        onFileClick={async (relativePath: string) => {
+          if (!activeSession) return;
+          try {
+            const fullPath = `${activeSession.fullPath}/${relativePath}`;
+            const content = await window.maestro.fs.readFile(fullPath);
+            const filename = relativePath.split('/').pop() || relativePath;
+            setPreviewFile({
+              name: filename,
+              content,
+              path: fullPath
+            });
+            setActiveFocus('main');
+          } catch (error) {
+            console.error('[onFileClick] Failed to read file:', error);
+          }
         }}
       />
       )}

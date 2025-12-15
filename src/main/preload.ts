@@ -656,6 +656,7 @@ contextBridge.exposeInMainWorld('maestro', {
       totalRuns: number;
       longestRunMs?: number;
       longestRunDate?: string;
+      currentRunMs?: number;
       theme?: string;
       clientToken?: string;
       authToken?: string;
@@ -1174,6 +1175,7 @@ export interface MaestroAPI {
       totalRuns: number;
       longestRunMs?: number;
       longestRunDate?: string;
+      currentRunMs?: number;
       clientToken?: string;
       authToken?: string;
     }) => Promise<{

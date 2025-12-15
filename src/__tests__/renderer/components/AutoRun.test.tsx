@@ -137,6 +137,28 @@ const setupMaestroMock = () => {
   return mockMaestro;
 };
 
+// Helper to create a valid BatchRunState with the new interface
+const createBatchRunState = (overrides: Partial<BatchRunState> = {}): BatchRunState => ({
+  isRunning: true,
+  isStopping: false,
+  documents: ['test-doc'],
+  lockedDocuments: ['test-doc'], // Lock the default selectedFile so isLocked = true
+  currentDocumentIndex: 0,
+  currentDocTasksTotal: 5,
+  currentDocTasksCompleted: 2,
+  totalTasksAcrossAllDocs: 10,
+  completedTasksAcrossAllDocs: 4,
+  loopEnabled: false,
+  loopIteration: 0,
+  folderPath: '/test/folder',
+  worktreeActive: false,
+  totalTasks: 5,
+  completedTasks: 2,
+  currentTaskIndex: 0,
+  originalContent: '',
+  ...overrides,
+});
+
 // Default props for AutoRun component
 const createDefaultProps = (overrides: Partial<React.ComponentProps<typeof AutoRun>> = {}) => ({
   theme: createMockTheme(),
@@ -219,15 +241,7 @@ describe('AutoRun', () => {
     });
 
     it('displays Stop button when batch run is active', () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -253,15 +267,7 @@ describe('AutoRun', () => {
     });
 
     it('disables Edit button when batch run is active', () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -297,15 +303,7 @@ describe('AutoRun', () => {
     });
 
     it('does not allow editing when locked', () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -652,15 +650,7 @@ describe('AutoRun', () => {
 
     it('calls onStopBatchRun when clicking Stop', async () => {
       const onStopBatchRun = vi.fn();
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState, onStopBatchRun });
       render(<AutoRun {...props} />);
 
@@ -670,15 +660,7 @@ describe('AutoRun', () => {
     });
 
     it('shows Stopping... when isStopping is true', () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: true,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState({ isStopping: true });
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -815,15 +797,7 @@ describe('AutoRun', () => {
     });
 
     it('hides image upload button when locked', () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -839,15 +813,7 @@ describe('AutoRun', () => {
     });
 
     it('does not handle paste when locked', async () => {
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       const props = createDefaultProps({ batchRunState });
       render(<AutoRun {...props} />);
 
@@ -1017,15 +983,7 @@ describe('AutoRun', () => {
       const { rerender } = render(<AutoRun {...props} />);
 
       // Start batch run
-      const batchRunState: BatchRunState = {
-        isRunning: true,
-        isStopping: false,
-        currentTaskIndex: 0,
-        totalTasks: 5,
-        completedTasks: [],
-        failedTasks: [],
-        skippedTasks: [],
-      };
+      const batchRunState = createBatchRunState();
       rerender(<AutoRun {...props} batchRunState={batchRunState} />);
 
       expect(props.onModeChange).toHaveBeenCalledWith('preview');
@@ -1838,15 +1796,7 @@ describe('Mode Restoration After Batch Run', () => {
     const { rerender } = render(<AutoRun {...props} />);
 
     // Start batch run (this switches to preview mode)
-    const batchRunState: BatchRunState = {
-      isRunning: true,
-      isStopping: false,
-      currentTaskIndex: 0,
-      totalTasks: 5,
-      completedTasks: [],
-      failedTasks: [],
-      skippedTasks: [],
-    };
+    const batchRunState = createBatchRunState();
     rerender(<AutoRun {...props} batchRunState={batchRunState} />);
 
     // Should have called onModeChange to switch to preview
@@ -2104,15 +2054,7 @@ describe('Batch Run State UI', () => {
   });
 
   it('shows task progress in batch run state', () => {
-    const batchRunState: BatchRunState = {
-      isRunning: true,
-      isStopping: false,
-      currentTaskIndex: 2,
-      totalTasks: 5,
-      completedTasks: ['task1', 'task2'],
-      failedTasks: [],
-      skippedTasks: [],
-    };
+    const batchRunState = createBatchRunState();
     const props = createDefaultProps({ batchRunState });
     render(<AutoRun {...props} />);
 
@@ -2123,15 +2065,7 @@ describe('Batch Run State UI', () => {
   });
 
   it('shows textarea as readonly when locked', () => {
-    const batchRunState: BatchRunState = {
-      isRunning: true,
-      isStopping: false,
-      currentTaskIndex: 0,
-      totalTasks: 5,
-      completedTasks: [],
-      failedTasks: [],
-      skippedTasks: [],
-    };
+    const batchRunState = createBatchRunState();
     const props = createDefaultProps({ batchRunState, mode: 'edit' });
     render(<AutoRun {...props} />);
 

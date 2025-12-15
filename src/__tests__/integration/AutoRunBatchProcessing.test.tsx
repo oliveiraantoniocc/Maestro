@@ -142,6 +142,7 @@ const createBatchRunState = (overrides: Partial<BatchRunState> = {}): BatchRunSt
   isRunning: false,
   isStopping: false,
   documents: ['Phase 1'],
+  lockedDocuments: ['Phase 1'], // Lock the default selectedFile so isLocked = true when isRunning
   currentDocumentIndex: 0,
   currentDocTasksTotal: 3,
   currentDocTasksCompleted: 0,

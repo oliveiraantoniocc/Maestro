@@ -2874,6 +2874,7 @@ function setupIpcHandlers() {
         totalRuns: number;
         longestRunMs?: number;
         longestRunDate?: string;
+        currentRunMs?: number; // Duration in milliseconds of the run that just completed
         theme?: string;
         clientToken?: string; // Client-generated token for polling auth status
         authToken?: string;   // Required for confirmed email addresses

@@ -1323,15 +1323,20 @@ describe('Auto Run + RightPanel Integration', () => {
         isRunning: true,
         isStopping: false,
         documents: ['Phase 1'],
+        lockedDocuments: ['Phase 1'],
         currentDocumentIndex: 0,
         totalTasks: 5,
         completedTasks: 2,
+        currentTaskIndex: 0,
         currentDocTasksTotal: 5,
         currentDocTasksCompleted: 2,
         totalTasksAcrossAllDocs: 5,
         completedTasksAcrossAllDocs: 2,
         loopEnabled: false,
         loopIteration: 0,
+        folderPath: '/test/folder',
+        worktreeActive: false,
+        originalContent: '',
       };
 
       render(
@@ -1398,15 +1403,20 @@ describe('Auto Run + RightPanel Integration', () => {
           isRunning: true,
           isStopping: false,
           documents: ['Phase 1'],
+          lockedDocuments: ['Phase 1'],
           currentDocumentIndex: 0,
           totalTasks: 5,
           completedTasks: 2,
+          currentTaskIndex: 0,
           currentDocTasksTotal: 5,
           currentDocTasksCompleted: 2,
           totalTasksAcrossAllDocs: 5,
           completedTasksAcrossAllDocs: 2,
           loopEnabled: false,
           loopIteration: 0,
+          folderPath: '/test/folder',
+          worktreeActive: false,
+          originalContent: '',
         };
 
         return (

@@ -160,6 +160,10 @@ interface MainPanelProps {
   onOpenPromptComposer?: () => void;
   // Replay a user message (AI mode)
   onReplayMessage?: (text: string, images?: string[]) => void;
+  // File tree for linking file references in AI responses
+  fileTree?: import('../hooks/useFileExplorer').FileNode[];
+  // Callback when a file link is clicked in AI response
+  onFileClick?: (relativePath: string) => void;
 }
 
 export const MainPanel = forwardRef<MainPanelHandle, MainPanelProps>(function MainPanel(props, ref) {
@@ -903,6 +907,9 @@ export const MainPanel = forwardRef<MainPanelHandle, MainPanelProps>(function Ma
                 markdownEditMode={markdownEditMode}
                 setMarkdownEditMode={setMarkdownEditMode}
                 onReplayMessage={props.onReplayMessage}
+                fileTree={props.fileTree}
+                cwd={activeSession.cwd}
+                onFileClick={props.onFileClick}
               />
               </div>
 

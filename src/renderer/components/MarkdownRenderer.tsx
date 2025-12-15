@@ -1,10 +1,12 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard } from 'lucide-react';
 import type { Theme } from '../types';
+import type { FileNode } from '../hooks/useFileExplorer';
+import { remarkFileLinks } from '../utils/remarkFileLinks';
 
 // ============================================================================
 // CodeBlockWithCopy - Code block with copy button overlay
@@ -65,6 +67,12 @@ interface MarkdownRendererProps {
   onCopy: (text: string) => void;
   /** Optional additional className for the container */
   className?: string;
+  /** File tree for linking file references */
+  fileTree?: FileNode[];
+  /** Current working directory for proximity-based matching */
+  cwd?: string;
+  /** Callback when a file link is clicked */
+  onFileClick?: (path: string) => void;
 }
 
 /**
@@ -79,30 +87,47 @@ interface MarkdownRendererProps {
  * Note: Prose styles are injected at the TerminalOutput container level for performance.
  * This component assumes those styles are already present in a parent container.
  */
-export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '' }: MarkdownRendererProps) => {
+export const MarkdownRenderer = memo(({ content, theme, onCopy, className = '', fileTree, cwd, onFileClick }: MarkdownRendererProps) => {
+  // Memoize remark plugins to avoid recreating on every render
+  const remarkPlugins = useMemo(() => {
+    const plugins: any[] = [remarkGfm];
+    if (fileTree && fileTree.length > 0 && cwd) {
+      plugins.push([remarkFileLinks, { fileTree, cwd }]);
+    }
+    return plugins;
+  }, [fileTree, cwd]);
+
   return (
     <div
       className={`prose prose-sm max-w-none text-sm ${className}`}
       style={{ color: theme.colors.textMain, lineHeight: 1.4, paddingLeft: '0.5em' }}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         components={{
-          a: ({ node, href, children, ...props }) => (
-            <a
-              href={href}
-              {...props}
-              onClick={(e) => {
-                e.preventDefault();
-                if (href) {
-                  window.maestro.shell.openExternal(href);
-                }
-              }}
-              style={{ color: theme.colors.accent, textDecoration: 'underline', cursor: 'pointer' }}
-            >
-              {children}
-            </a>
-          ),
+          a: ({ node, href, children, ...props }) => {
+            // Handle maestro-file:// protocol for internal file links
+            const isMaestroFile = href?.startsWith('maestro-file://');
+            const filePath = isMaestroFile ? href.replace('maestro-file://', '') : null;
+
+            return (
+              <a
+                href={href}
+                {...props}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (isMaestroFile && filePath && onFileClick) {
+                    onFileClick(filePath);
+                  } else if (href) {
+                    window.maestro.shell.openExternal(href);
+                  }
+                }}
+                style={{ color: theme.colors.accent, textDecoration: 'underline', cursor: 'pointer' }}
+              >
+                {children}
+              </a>
+            );
+          },
           code: ({ node, inline, className, children, ...props }: any) => {
             const match = (className || '').match(/language-(\w+)/);
             const language = match ? match[1] : 'text';
