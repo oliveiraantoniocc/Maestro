@@ -3,6 +3,8 @@
  * Wraps IPC calls to main process for process operations
  */
 
+import { createIpcMethod } from './ipcWrapper';
+
 export interface ProcessConfig {
   cwd: string;
   command: string;
@@ -26,62 +28,52 @@ export const processService = {
   /**
    * Spawn a new process
    */
-  async spawn(sessionId: string, config: ProcessConfig): Promise<void> {
-    try {
-      await window.maestro.process.spawn(sessionId, config);
-    } catch (error) {
-      console.error('Process spawn error:', error);
-      throw error;
-    }
-  },
+  spawn: (sessionId: string, config: ProcessConfig): Promise<void> =>
+    createIpcMethod({
+      call: () => window.maestro.process.spawn(sessionId, config),
+      errorContext: 'Process spawn',
+      rethrow: true,
+    }),
 
   /**
    * Write data to process stdin
    */
-  async write(sessionId: string, data: string): Promise<void> {
-    try {
-      await window.maestro.process.write(sessionId, data);
-    } catch (error) {
-      console.error('Process write error:', error);
-      throw error;
-    }
-  },
+  write: (sessionId: string, data: string): Promise<void> =>
+    createIpcMethod({
+      call: () => window.maestro.process.write(sessionId, data),
+      errorContext: 'Process write',
+      rethrow: true,
+    }),
 
   /**
    * Interrupt a process (send SIGINT/Ctrl+C)
    */
-  async interrupt(sessionId: string): Promise<void> {
-    try {
-      await window.maestro.process.interrupt(sessionId);
-    } catch (error) {
-      console.error('Process interrupt error:', error);
-      throw error;
-    }
-  },
+  interrupt: (sessionId: string): Promise<void> =>
+    createIpcMethod({
+      call: () => window.maestro.process.interrupt(sessionId),
+      errorContext: 'Process interrupt',
+      rethrow: true,
+    }),
 
   /**
    * Kill a process
    */
-  async kill(sessionId: string): Promise<void> {
-    try {
-      await window.maestro.process.kill(sessionId);
-    } catch (error) {
-      console.error('Process kill error:', error);
-      throw error;
-    }
-  },
+  kill: (sessionId: string): Promise<void> =>
+    createIpcMethod({
+      call: () => window.maestro.process.kill(sessionId),
+      errorContext: 'Process kill',
+      rethrow: true,
+    }),
 
   /**
    * Resize PTY terminal
    */
-  async resize(sessionId: string, cols: number, rows: number): Promise<void> {
-    try {
-      await window.maestro.process.resize(sessionId, cols, rows);
-    } catch (error) {
-      console.error('Process resize error:', error);
-      throw error;
-    }
-  },
+  resize: (sessionId: string, cols: number, rows: number): Promise<void> =>
+    createIpcMethod({
+      call: () => window.maestro.process.resize(sessionId, cols, rows),
+      errorContext: 'Process resize',
+      rethrow: true,
+    }),
 
   /**
    * Register handler for process data events
