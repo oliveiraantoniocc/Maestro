@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, RefObject } from 'react';
+import { useClickOutside } from './useClickOutside';
 
 /**
  * Tunnel status states for remote access via Cloudflare tunnel
@@ -94,17 +95,7 @@ export function useLiveOverlay(isLiveMode: boolean): UseLiveOverlayReturn {
   }, []);
 
   // Close live overlay when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (liveOverlayRef.current && !liveOverlayRef.current.contains(e.target as Node)) {
-        setLiveOverlayOpen(false);
-      }
-    };
-    if (liveOverlayOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [liveOverlayOpen]);
+  useClickOutside(liveOverlayRef, () => setLiveOverlayOpen(false), liveOverlayOpen);
 
   // Check for cloudflared installation when Live overlay opens
   useEffect(() => {
