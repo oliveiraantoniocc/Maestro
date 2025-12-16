@@ -30,6 +30,7 @@ export { useCliActivityMonitoring } from './useCliActivityMonitoring';
 export { useThemeStyles } from './useThemeStyles';
 export { useSortedSessions, stripLeadingEmojis, compareNamesIgnoringEmojis } from './useSortedSessions';
 export { useInputProcessing, DEFAULT_IMAGE_ONLY_PROMPT } from './useInputProcessing';
+export { useModalLayer } from './useModalLayer';
 
 export type { UseSettingsReturn } from './useSettings';
 export type { UseSessionManagerReturn } from './useSessionManager';
@@ -111,3 +112,4 @@ export type {
   UseInputProcessingReturn,
   BatchState,
 } from './useInputProcessing';
+export type { UseModalLayerOptions } from './useModalLayer';
