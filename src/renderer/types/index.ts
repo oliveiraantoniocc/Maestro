@@ -396,6 +396,10 @@ export interface Session {
   // File preview navigation history (per-session to prevent cross-agent navigation)
   filePreviewHistory?: {name: string; content: string; path: string}[];
   filePreviewHistoryIndex?: number;
+
+  // Nudge message - appended to every interactive user message (max 1000 chars)
+  // Not visible in UI, but sent to the agent with each message
+  nudgeMessage?: string;
 }
 
 export interface Group {

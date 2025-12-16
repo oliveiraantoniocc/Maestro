@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { NewInstanceModal } from './components/NewInstanceModal';
+import { NewInstanceModal, EditAgentModal } from './components/NewInstanceModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SessionList } from './components/SessionList';
 import { RightPanel, RightPanelHandle } from './components/RightPanel';
@@ -264,6 +264,8 @@ export default function MaestroConsole() {
   // Modals
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [newInstanceModalOpen, setNewInstanceModalOpen] = useState(false);
+  const [editAgentModalOpen, setEditAgentModalOpen] = useState(false);
+  const [editAgentSession, setEditAgentSession] = useState<Session | null>(null);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
   const [shortcutsSearchQuery, setShortcutsSearchQuery] = useState('');
   const [quickActionOpen, setQuickActionOpen] = useState(false);
@@ -2550,7 +2552,7 @@ export default function MaestroConsole() {
     setNewInstanceModalOpen(true);
   };
 
-  const createNewSession = async (agentId: string, workingDir: string, name: string) => {
+  const createNewSession = async (agentId: string, workingDir: string, name: string, nudgeMessage?: string) => {
     // Validate uniqueness before creating
     const validation = validateNewSession(name, workingDir, agentId as ToolType, sessions);
     if (!validation.valid) {
@@ -2652,7 +2654,9 @@ export default function MaestroConsole() {
         // Tab management - start with a fresh empty tab
         aiTabs: [initialTab],
         activeTabId: initialTabId,
-        closedTabHistory: []
+        closedTabHistory: [],
+        // Nudge message - appended to every interactive user message
+        nudgeMessage
       };
       setSessions(prev => [...prev, newSession]);
       setActiveSessionId(newId);
@@ -2943,6 +2947,26 @@ export default function MaestroConsole() {
       }
     } catch (error) {
       console.error('[toggleGlobalLive] Error:', error);
+    }
+  };
+
+  // Restart web server (used when port settings change while server is running)
+  const restartWebServer = async (): Promise<string | null> => {
+    if (!isLiveMode) return null;
+    try {
+      // Stop and restart the server to pick up new port settings
+      await window.maestro.live.stopServer();
+      const result = await window.maestro.live.startServer();
+      if (result.success && result.url) {
+        setWebInterfaceUrl(result.url);
+        return result.url;
+      } else {
+        console.error('[restartWebServer] Failed to restart server:', result.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('[restartWebServer] Error:', error);
+      return null;
     }
   };
 
@@ -4736,6 +4760,7 @@ export default function MaestroConsole() {
             setWebInterfaceUseCustomPort={settings.setWebInterfaceUseCustomPort}
             webInterfaceCustomPort={settings.webInterfaceCustomPort}
             setWebInterfaceCustomPort={settings.setWebInterfaceCustomPort}
+            restartWebServer={restartWebServer}
             bookmarksCollapsed={bookmarksCollapsed}
             setBookmarksCollapsed={setBookmarksCollapsed}
             ungroupedCollapsed={settings.ungroupedCollapsed}
@@ -4768,6 +4793,10 @@ export default function MaestroConsole() {
             setRenameInstanceModalOpen={setRenameInstanceModalOpen}
             setRenameInstanceValue={setRenameInstanceValue}
             setRenameInstanceSessionId={setRenameInstanceSessionId}
+            onEditAgent={(session) => {
+              setEditAgentSession(session);
+              setEditAgentModalOpen(true);
+            }}
             activeBatchSessionIds={activeBatchSessionIds}
             showSessionJumpNumbers={showSessionJumpNumbers}
             visibleSessions={visibleSessions}
@@ -5535,6 +5564,24 @@ export default function MaestroConsole() {
         onCreate={createNewSession}
         theme={theme}
         defaultAgent={defaultAgent}
+        existingSessions={sessionsForValidation}
+      />
+
+      {/* --- EDIT AGENT MODAL --- */}
+      <EditAgentModal
+        isOpen={editAgentModalOpen}
+        onClose={() => {
+          setEditAgentModalOpen(false);
+          setEditAgentSession(null);
+        }}
+        onSave={(sessionId, name, nudgeMessage) => {
+          setSessions(prev => prev.map(s => {
+            if (s.id !== sessionId) return s;
+            return { ...s, name, nudgeMessage };
+          }));
+        }}
+        theme={theme}
+        session={editAgentSession}
         existingSessions={sessionsForValidation}
       />
 

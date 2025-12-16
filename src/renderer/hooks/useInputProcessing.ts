@@ -478,11 +478,17 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
     }
 
     // Capture input value and images before clearing (needed for async batch mode spawn)
-    const capturedInputValue = effectiveInputValue;
+    // Append nudge message if present (only for interactive AI messages, not Auto Run)
+    // The nudge is invisible in the UI - only sent to the agent
+    const nudgeMessage = activeSession.nudgeMessage;
+    const capturedInputValue = nudgeMessage && currentMode === 'ai'
+      ? `${effectiveInputValue}\n\n---\n\n${nudgeMessage}`
+      : effectiveInputValue;
     const capturedImages = [...stagedImages];
 
     // Broadcast user input to web clients so they stay in sync
-    window.maestro.web.broadcastUserInput(activeSession.id, capturedInputValue, currentMode);
+    // Use effectiveInputValue (without nudge) since nudge should be hidden from UI
+    window.maestro.web.broadcastUserInput(activeSession.id, effectiveInputValue, currentMode);
 
     setInputValue('');
     setStagedImages([]);

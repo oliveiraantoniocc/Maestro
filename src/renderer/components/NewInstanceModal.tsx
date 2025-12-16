@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Folder, RefreshCw } from 'lucide-react';
 import type { AgentConfig, Session, ToolType } from '../types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { validateNewSession } from '../utils/sessionValidation';
+import { validateNewSession, validateEditSession } from '../utils/sessionValidation';
 import { FormInput } from './ui/FormInput';
 import { Modal, ModalFooter } from './ui/Modal';
+
+// Maximum character length for nudge message
+const NUDGE_MESSAGE_MAX_LENGTH = 1000;
 
 interface AgentDebugInfo {
   agentId: string;
@@ -21,9 +24,18 @@ interface AgentDebugInfo {
 interface NewInstanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (agentId: string, workingDir: string, name: string) => void;
+  onCreate: (agentId: string, workingDir: string, name: string, nudgeMessage?: string) => void;
   theme: any;
   defaultAgent: string;
+  existingSessions: Session[];
+}
+
+interface EditAgentModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (sessionId: string, name: string, nudgeMessage?: string) => void;
+  theme: any;
+  session: Session | null;
   existingSessions: Session[];
 }
 
@@ -32,6 +44,7 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
   const [selectedAgent, setSelectedAgent] = useState(defaultAgent);
   const [workingDir, setWorkingDir] = useState('');
   const [instanceName, setInstanceName] = useState('');
+  const [nudgeMessage, setNudgeMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshingAgent, setRefreshingAgent] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<AgentDebugInfo | null>(null);
@@ -123,13 +136,14 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
     const result = validateNewSession(name, expandedWorkingDir, selectedAgent as ToolType, existingSessions);
     if (!result.valid) return;
 
-    onCreate(selectedAgent, expandedWorkingDir, name);
+    onCreate(selectedAgent, expandedWorkingDir, name, nudgeMessage.trim() || undefined);
     onClose();
 
     // Reset
     setInstanceName('');
     setWorkingDir('');
-  }, [instanceName, selectedAgent, workingDir, onCreate, onClose, expandTilde, existingSessions]);
+    setNudgeMessage('');
+  }, [instanceName, selectedAgent, workingDir, nudgeMessage, onCreate, onClose, expandTilde, existingSessions]);
 
   // Check if form is valid for submission
   const isFormValid = useMemo(() => {
@@ -382,6 +396,199 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, defaultAgen
               </button>
             }
           />
+
+          {/* Nudge Message */}
+          <div>
+            <label className="block text-xs font-bold opacity-70 uppercase mb-2" style={{ color: theme.colors.textMain }}>
+              Nudge Message <span className="font-normal opacity-50">(optional)</span>
+            </label>
+            <textarea
+              value={nudgeMessage}
+              onChange={(e) => setNudgeMessage(e.target.value.slice(0, NUDGE_MESSAGE_MAX_LENGTH))}
+              placeholder="Instructions appended to every message you send..."
+              className="w-full p-2 rounded border bg-transparent outline-none resize-none text-sm"
+              style={{
+                borderColor: theme.colors.border,
+                color: theme.colors.textMain,
+                minHeight: '80px',
+              }}
+              maxLength={NUDGE_MESSAGE_MAX_LENGTH}
+            />
+            <p className="mt-1 text-xs" style={{ color: theme.colors.textDim }}>
+              {nudgeMessage.length}/{NUDGE_MESSAGE_MAX_LENGTH} characters. This text is added to every message you send to the agent (not visible in chat).
+            </p>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+/**
+ * EditAgentModal - Modal for editing an existing agent's settings
+ *
+ * Allows editing:
+ * - Agent name
+ * - Nudge message
+ *
+ * Does NOT allow editing:
+ * - Agent provider (toolType)
+ * - Working directory (projectRoot)
+ */
+export function EditAgentModal({ isOpen, onClose, onSave, theme, session, existingSessions }: EditAgentModalProps) {
+  const [instanceName, setInstanceName] = useState('');
+  const [nudgeMessage, setNudgeMessage] = useState('');
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Populate form when session changes or modal opens
+  useEffect(() => {
+    if (isOpen && session) {
+      setInstanceName(session.name);
+      setNudgeMessage(session.nudgeMessage || '');
+    }
+  }, [isOpen, session]);
+
+  // Validate session name uniqueness (excluding current session)
+  const validation = useMemo(() => {
+    const name = instanceName.trim();
+    if (!name || !session) {
+      return { valid: true }; // Don't show errors until fields are filled
+    }
+    return validateEditSession(name, session.id, existingSessions);
+  }, [instanceName, session, existingSessions]);
+
+  const handleSave = useCallback(() => {
+    if (!session) return;
+    const name = instanceName.trim();
+    if (!name) return;
+
+    // Validate before saving
+    const result = validateEditSession(name, session.id, existingSessions);
+    if (!result.valid) return;
+
+    onSave(session.id, name, nudgeMessage.trim() || undefined);
+    onClose();
+  }, [session, instanceName, nudgeMessage, onSave, onClose, existingSessions]);
+
+  // Check if form is valid for submission
+  const isFormValid = useMemo(() => {
+    return instanceName.trim() && validation.valid;
+  }, [instanceName, validation.valid]);
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Handle Cmd+Enter for saving
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isFormValid) {
+        handleSave();
+      }
+      return;
+    }
+  }, [handleSave, isFormValid]);
+
+  if (!isOpen || !session) return null;
+
+  // Get agent name for display
+  const agentName = session.toolType === 'claude-code' ? 'Claude Code' : session.toolType;
+
+  return (
+    <div onKeyDown={handleKeyDown}>
+      <Modal
+        theme={theme}
+        title="Edit Agent"
+        priority={MODAL_PRIORITIES.NEW_INSTANCE}
+        onClose={onClose}
+        width={500}
+        initialFocusRef={nameInputRef}
+        footer={
+          <ModalFooter
+            theme={theme}
+            onCancel={onClose}
+            onConfirm={handleSave}
+            confirmLabel="Save Changes"
+            confirmDisabled={!isFormValid}
+          />
+        }
+      >
+        <div className="space-y-5">
+          {/* Agent Name */}
+          <FormInput
+            ref={nameInputRef}
+            id="edit-agent-name-input"
+            theme={theme}
+            label="Agent Name"
+            value={instanceName}
+            onChange={setInstanceName}
+            placeholder=""
+            error={validation.errorField === 'name' ? validation.error : undefined}
+            heightClass="p-2"
+          />
+
+          {/* Agent Provider (read-only) */}
+          <div>
+            <label className="block text-xs font-bold opacity-70 uppercase mb-2" style={{ color: theme.colors.textMain }}>
+              Agent Provider
+            </label>
+            <div
+              className="p-2 rounded border text-sm"
+              style={{
+                borderColor: theme.colors.border,
+                color: theme.colors.textDim,
+                backgroundColor: theme.colors.bgActivity,
+              }}
+            >
+              {agentName}
+            </div>
+            <p className="mt-1 text-xs" style={{ color: theme.colors.textDim }}>
+              Provider cannot be changed after creation.
+            </p>
+          </div>
+
+          {/* Working Directory (read-only) */}
+          <div>
+            <label className="block text-xs font-bold opacity-70 uppercase mb-2" style={{ color: theme.colors.textMain }}>
+              Working Directory
+            </label>
+            <div
+              className="p-2 rounded border font-mono text-sm overflow-hidden text-ellipsis"
+              style={{
+                borderColor: theme.colors.border,
+                color: theme.colors.textDim,
+                backgroundColor: theme.colors.bgActivity,
+              }}
+              title={session.projectRoot}
+            >
+              {session.projectRoot}
+            </div>
+            <p className="mt-1 text-xs" style={{ color: theme.colors.textDim }}>
+              Directory cannot be changed. Create a new agent for a different directory.
+            </p>
+          </div>
+
+          {/* Nudge Message */}
+          <div>
+            <label className="block text-xs font-bold opacity-70 uppercase mb-2" style={{ color: theme.colors.textMain }}>
+              Nudge Message <span className="font-normal opacity-50">(optional)</span>
+            </label>
+            <textarea
+              value={nudgeMessage}
+              onChange={(e) => setNudgeMessage(e.target.value.slice(0, NUDGE_MESSAGE_MAX_LENGTH))}
+              placeholder="Instructions appended to every message you send..."
+              className="w-full p-2 rounded border bg-transparent outline-none resize-none text-sm"
+              style={{
+                borderColor: theme.colors.border,
+                color: theme.colors.textMain,
+                minHeight: '80px',
+              }}
+              maxLength={NUDGE_MESSAGE_MAX_LENGTH}
+            />
+            <p className="mt-1 text-xs" style={{ color: theme.colors.textDim }}>
+              {nudgeMessage.length}/{NUDGE_MESSAGE_MAX_LENGTH} characters. This text is added to every message you send to the agent (not visible in chat).
+            </p>
+          </div>
         </div>
       </Modal>
     </div>

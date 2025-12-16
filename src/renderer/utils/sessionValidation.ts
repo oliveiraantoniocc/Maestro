@@ -53,6 +53,34 @@ export function validateNewSession(
 }
 
 /**
+ * Validates that a session can be edited with the given name.
+ *
+ * Rules:
+ * 1. Session names must be unique across all sessions (excluding the current session)
+ */
+export function validateEditSession(
+  name: string,
+  sessionId: string,
+  existingSessions: Session[]
+): SessionValidationResult {
+  const trimmedName = name.trim();
+
+  // Check for duplicate name (excluding the current session)
+  const duplicateName = existingSessions.find(
+    session => session.id !== sessionId && session.name.toLowerCase() === trimmedName.toLowerCase()
+  );
+  if (duplicateName) {
+    return {
+      valid: false,
+      error: `An agent named "${duplicateName.name}" already exists`,
+      errorField: 'name'
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Normalize directory path for comparison.
  * Removes trailing slashes and resolves common variations.
  */

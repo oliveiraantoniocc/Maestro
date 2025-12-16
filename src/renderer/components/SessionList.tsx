@@ -24,6 +24,7 @@ interface SessionContextMenuProps {
   session: Session;
   groups: Group[];
   onRename: () => void;
+  onEdit: () => void;
   onToggleBookmark: () => void;
   onMoveToGroup: (groupId: string) => void;
   onDelete: () => void;
@@ -37,6 +38,7 @@ function SessionContextMenu({
   session,
   groups,
   onRename,
+  onEdit,
   onToggleBookmark,
   onMoveToGroup,
   onDelete,
@@ -88,6 +90,19 @@ function SessionContextMenu({
       >
         <Edit3 className="w-3.5 h-3.5" />
         Rename
+      </button>
+
+      {/* Edit Agent */}
+      <button
+        onClick={() => {
+          onEdit();
+          onDismiss();
+        }}
+        className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+        style={{ color: theme.colors.textMain }}
+      >
+        <Settings className="w-3.5 h-3.5" />
+        Edit Agent...
       </button>
 
       {/* Toggle Bookmark */}
@@ -239,6 +254,7 @@ interface SessionListProps {
   setWebInterfaceUseCustomPort: (value: boolean) => void;
   webInterfaceCustomPort: number;
   setWebInterfaceCustomPort: (value: number) => void;
+  restartWebServer: () => Promise<string | null>;
 
   // Bookmarks folder state (lifted from component to App.tsx for keyboard shortcut access)
   bookmarksCollapsed: boolean;
@@ -280,6 +296,9 @@ interface SessionListProps {
   setRenameInstanceValue: (value: string) => void;
   setRenameInstanceSessionId: (id: string) => void;
 
+  // Edit agent modal handler (for context menu edit)
+  onEditAgent: (session: Session) => void;
+
   // Auto mode props
   activeBatchSessionIds?: string[]; // Session IDs that are running in auto mode
 
@@ -308,6 +327,7 @@ export function SessionList(props: SessionListProps) {
     isLiveMode, webInterfaceUrl, toggleGlobalLive,
     webInterfaceUseCustomPort, setWebInterfaceUseCustomPort,
     webInterfaceCustomPort, setWebInterfaceCustomPort,
+    restartWebServer,
     bookmarksCollapsed, setBookmarksCollapsed,
     ungroupedCollapsed, setUngroupedCollapsed,
     setActiveFocus, setActiveSessionId, setLeftSidebarOpen, setLeftSidebarWidthState,
@@ -316,6 +336,7 @@ export function SessionList(props: SessionListProps) {
     finishRenamingGroup, finishRenamingSession, startRenamingGroup,
     startRenamingSession, showConfirmation, setGroups, setSessions, createNewGroup, addNewSession,
     setRenameInstanceModalOpen, setRenameInstanceValue, setRenameInstanceSessionId,
+    onEditAgent,
     activeBatchSessionIds = [],
     showSessionJumpNumbers = false,
     visibleSessions = [],
@@ -781,21 +802,23 @@ export function SessionList(props: SessionListProps) {
 
                           {/* Toggle Switch */}
                           <button
-                            onClick={() => setWebInterfaceUseCustomPort(!webInterfaceUseCustomPort)}
-                            disabled={isLiveMode}
+                            onClick={async () => {
+                              setWebInterfaceUseCustomPort(!webInterfaceUseCustomPort);
+                              // If server is running, restart it to apply the change
+                              if (isLiveMode) {
+                                // Small delay to ensure setting is persisted before restart
+                                setTimeout(() => restartWebServer(), 100);
+                              }
+                            }}
                             className={`relative w-10 h-5 rounded-full transition-colors ${
                               webInterfaceUseCustomPort
                                 ? 'bg-green-500'
-                                : isLiveMode
-                                  ? 'bg-gray-700 opacity-50 cursor-not-allowed'
-                                  : 'bg-gray-600 hover:bg-gray-500'
+                                : 'bg-gray-600 hover:bg-gray-500'
                             }`}
                             title={
-                              isLiveMode
-                                ? 'Turn off web interface to change port settings'
-                                : webInterfaceUseCustomPort
-                                  ? 'Use random port'
-                                  : 'Use custom port'
+                              webInterfaceUseCustomPort
+                                ? 'Use random port'
+                                : 'Use custom port'
                             }
                           >
                             <div
@@ -821,10 +844,20 @@ export function SessionList(props: SessionListProps) {
                                     setWebInterfaceCustomPort(value);
                                   }
                                 }}
-                                disabled={isLiveMode}
-                                className={`flex-1 px-2 py-1 text-[11px] font-mono rounded border outline-none ${
-                                  isLiveMode ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
+                                onBlur={() => {
+                                  // Restart server when user finishes editing the port (on blur)
+                                  if (isLiveMode) {
+                                    restartWebServer();
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  // Restart server when user presses Enter
+                                  if (e.key === 'Enter' && isLiveMode) {
+                                    restartWebServer();
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                }}
+                                className="flex-1 px-2 py-1 text-[11px] font-mono rounded border outline-none"
                                 style={{
                                   backgroundColor: theme.colors.bgActivity,
                                   borderColor: theme.colors.border,
@@ -833,16 +866,9 @@ export function SessionList(props: SessionListProps) {
                                 placeholder="8080"
                               />
                             </div>
-                            {isLiveMode && (
-                              <div className="text-[9px] text-yellow-500 mt-1">
-                                Turn off web interface to change port
-                              </div>
-                            )}
-                            {!isLiveMode && (
-                              <div className="text-[9px] mt-1" style={{ color: theme.colors.textDim, opacity: 0.7 }}>
-                                Port range: 1024-65535
-                              </div>
-                            )}
+                            <div className="text-[9px] mt-1" style={{ color: theme.colors.textDim, opacity: 0.7 }}>
+                              {isLiveMode ? 'Press Enter or click away to apply' : 'Port range: 1024-65535'}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2074,6 +2100,7 @@ export function SessionList(props: SessionListProps) {
             setRenameInstanceSessionId(contextMenuSession.id);
             setRenameInstanceModalOpen(true);
           }}
+          onEdit={() => onEditAgent(contextMenuSession)}
           onToggleBookmark={() => toggleBookmark(contextMenuSession.id)}
           onMoveToGroup={(groupId) => handleMoveToGroup(contextMenuSession.id, groupId)}
           onDelete={() => handleDeleteSession(contextMenuSession.id)}
