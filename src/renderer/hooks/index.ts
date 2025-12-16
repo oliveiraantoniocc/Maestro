@@ -7,6 +7,8 @@ export { useNavigationHistory } from './useNavigationHistory';
 export { useDebouncedValue, useThrottledCallback } from './useThrottle';
 export { useDebouncedPersistence, DEFAULT_DEBOUNCE_DELAY } from './useDebouncedPersistence';
 export type { UseDebouncedPersistenceReturn } from './useDebouncedPersistence';
+export { useBatchedSessionUpdates, DEFAULT_BATCH_FLUSH_INTERVAL } from './useBatchedSessionUpdates';
+export type { UseBatchedSessionUpdatesReturn, BatchedUpdater } from './useBatchedSessionUpdates';
 export { useAutoRunHandlers } from './useAutoRunHandlers';
 export { useInputSync } from './useInputSync';
 export { useSessionNavigation } from './useSessionNavigation';
