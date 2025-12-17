@@ -10,6 +10,10 @@ interface ProcessConfig {
   prompt?: string;
   shell?: string;
   images?: string[]; // Base64 data URLs for images
+  // Agent-specific spawn options (used to build args via agent config)
+  agentSessionId?: string;  // For session resume (uses agent's resumeArgs builder)
+  readOnlyMode?: boolean;   // For read-only/plan mode (uses agent's readOnlyArgs)
+  modelId?: string;         // For model selection (uses agent's modelArgs builder)
 }
 
 /**

@@ -65,6 +65,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
   const { getProcessManager, getAgentDetector, agentConfigsStore, settingsStore } = deps;
 
   // Spawn a new process for a session
+  // Supports agent-specific argument builders for batch mode, JSON output, resume, and read-only mode
   ipcMain.handle(
     'process:spawn',
     withIpcErrorLogging(handlerOpts('spawn'), async (config: {
@@ -76,15 +77,56 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
       prompt?: string;
       shell?: string;
       images?: string[]; // Base64 data URLs for images
+      // Agent-specific spawn options (used to build args via agent config)
+      agentSessionId?: string;  // For session resume
+      readOnlyMode?: boolean;   // For read-only/plan mode
+      modelId?: string;         // For model selection
     }) => {
       const processManager = requireProcessManager(getProcessManager);
       const agentDetector = requireDependency(getAgentDetector, 'Agent detector');
 
-      // Get agent definition to access config options
+      // Get agent definition to access config options and argument builders
       const agent = await agentDetector.getAgent(config.toolType);
       let finalArgs = [...config.args];
 
-      // Build additional args from agent configuration
+      // ========================================================================
+      // Build args from agent argument builders (for multi-agent support)
+      // ========================================================================
+      if (agent) {
+        // For batch mode agents: prepend batch mode prefix (e.g., 'run' for OpenCode)
+        // This must come BEFORE base args to form: opencode run --format json ...
+        if (agent.batchModePrefix && config.prompt) {
+          finalArgs = [...agent.batchModePrefix, ...finalArgs];
+        }
+
+        // Add JSON output args if the agent supports it
+        // For Claude: already in base args (--output-format stream-json)
+        // For OpenCode: added here (--format json)
+        if (agent.jsonOutputArgs && !finalArgs.some(arg => agent.jsonOutputArgs!.includes(arg))) {
+          finalArgs = [...finalArgs, ...agent.jsonOutputArgs];
+        }
+
+        // Add session resume args if agentSessionId is provided
+        if (config.agentSessionId && agent.resumeArgs) {
+          const resumeArgArray = agent.resumeArgs(config.agentSessionId);
+          finalArgs = [...finalArgs, ...resumeArgArray];
+        }
+
+        // Add read-only mode args if readOnlyMode is true
+        if (config.readOnlyMode && agent.readOnlyArgs) {
+          finalArgs = [...finalArgs, ...agent.readOnlyArgs];
+        }
+
+        // Add model selection args if modelId is provided
+        if (config.modelId && agent.modelArgs) {
+          const modelArgArray = agent.modelArgs(config.modelId);
+          finalArgs = [...finalArgs, ...modelArgArray];
+        }
+      }
+
+      // ========================================================================
+      // Build additional args from agent configuration (legacy support)
+      // ========================================================================
       if (agent && agent.configOptions) {
         const agentConfig = agentConfigsStore.get('configs', {})[config.toolType] || {};
 
@@ -105,9 +147,14 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
       // If no shell is specified and this is a terminal session, use the default shell from settings
       const shellToUse = config.shell || (config.toolType === 'terminal' ? settingsStore.get('defaultShell', 'zsh') : undefined);
 
-      // Extract Claude session ID from --resume arg if present
+      // Extract session ID from args for logging (supports both --resume and --session flags)
       const resumeArgIndex = finalArgs.indexOf('--resume');
-      const agentSessionId = resumeArgIndex !== -1 ? finalArgs[resumeArgIndex + 1] : undefined;
+      const sessionArgIndex = finalArgs.indexOf('--session');
+      const agentSessionId = resumeArgIndex !== -1
+        ? finalArgs[resumeArgIndex + 1]
+        : sessionArgIndex !== -1
+          ? finalArgs[sessionArgIndex + 1]
+          : config.agentSessionId;
 
       logger.info(`Spawning process: ${config.command}`, LOG_CONTEXT, {
         sessionId: config.sessionId,
@@ -118,6 +165,8 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
         requiresPty: agent?.requiresPty || false,
         shell: shellToUse,
         ...(agentSessionId && { agentSessionId }),
+        ...(config.readOnlyMode && { readOnlyMode: true }),
+        ...(config.modelId && { modelId: config.modelId }),
         ...(config.prompt && { prompt: config.prompt.length > 500 ? config.prompt.substring(0, 500) + '...' : config.prompt })
       });
 
