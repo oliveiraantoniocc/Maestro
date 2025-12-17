@@ -739,15 +739,57 @@ Since OpenCode supports multiple providers/models, Maestro should consider:
 
 ---
 
-### Codex 📋 Planned
+### Codex ✅ Fully Implemented
 
-**Status:** Not yet implemented
+| Aspect | Value |
+|--------|-------|
+| Binary | `codex` |
+| JSON Output | `--json` |
+| Batch Mode | `exec` subcommand |
+| Resume | `resume <thread_id>` (v0.30.0+) |
+| Read-only | `--sandbox read-only` |
+| YOLO Mode | `--dangerously-bypass-approvals-and-sandbox` (enabled by default) |
+| Session ID Field | `thread_id` (from `thread.started` event) |
+| Session Storage | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` |
+| Context Window | 128K tokens |
+| Pricing | o4-mini: $1.10/$4.40 per million tokens (input/output) |
 
-**To Add:**
-1. Agent definition in `agent-detector.ts`
-2. Capabilities in `agent-capabilities.ts`
-3. Output parser for Codex JSON format
-4. Error patterns for OpenAI API errors
+**Implementation Status:**
+- ✅ Output Parser: `src/main/parsers/codex-output-parser.ts` (42 tests)
+- ✅ Session Storage: `src/main/storage/codex-session-storage.ts` (8 tests)
+- ✅ Error Patterns: `src/main/parsers/error-patterns.ts` (25 tests)
+- ✅ All capabilities enabled
+
+**JSON Event Types:**
+- `thread.started` → session_id (`thread_id`), initialization
+- `turn.started` → processing indicator
+- `item.completed (agent_message)` → final text response
+- `item.completed (reasoning)` → model thinking (partial text)
+- `item.completed (tool_call)` → tool invocation
+- `item.completed (tool_result)` → tool output
+- `turn.completed` → token usage (`input_tokens`, `output_tokens`, `reasoning_output_tokens`, `cached_input_tokens`)
+
+**Unique Features:**
+- **Reasoning Tokens:** Reports `reasoning_output_tokens` separately from `output_tokens`, displayed in UI
+- **Three Sandbox Levels:** `read-only`, `workspace-write`, `danger-full-access`
+- **Cached Input Discount:** 75% discount on cached input tokens ($0.275/million)
+- **YOLO Mode Default:** Full system access enabled by default in Maestro
+
+**Command Line Pattern:**
+```bash
+# Basic execution
+codex exec --json -C /path/to/project "prompt"
+
+# With YOLO mode (default in Maestro)
+codex exec --json --dangerously-bypass-approvals-and-sandbox -C /path/to/project "prompt"
+
+# Resume session
+codex exec --json resume <thread_id> "continue"
+```
+
+**Documentation Sources:**
+- [Codex CLI GitHub](https://github.com/openai/codex)
+- [OpenAI API Pricing](https://openai.com/api/pricing/)
 
 ---
 
