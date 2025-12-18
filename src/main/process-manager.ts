@@ -289,6 +289,14 @@ export class ProcessManager extends EventEmitter {
           env.PATH = standardPaths;
         }
 
+        // Set MAESTRO_SESSION_RESUMED env var when resuming an existing session
+        // This allows user hooks to differentiate between new sessions and resumed ones
+        // See: https://github.com/pedramamini/Maestro/issues/42
+        const isResuming = finalArgs.includes('--resume') || finalArgs.includes('--session');
+        if (isResuming) {
+          env.MAESTRO_SESSION_RESUMED = '1';
+        }
+
         logger.debug('[ProcessManager] About to spawn child process', 'ProcessManager', {
           command,
           finalArgs,

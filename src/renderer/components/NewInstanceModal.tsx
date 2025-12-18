@@ -602,6 +602,21 @@ export function NewInstanceModal({ isOpen, onClose, onCreate, theme, existingSes
               </div>
             )}
 
+            {/* Hook behavior note */}
+            <p className="text-xs mt-2" style={{ color: theme.colors.textDim }}>
+              Agent hooks run per-message. Use{' '}
+              <a
+                href="https://github.com/pedramamini/Maestro#environment-variables"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:opacity-80"
+                style={{ color: theme.colors.accent }}
+              >
+                MAESTRO_SESSION_RESUMED
+              </a>
+              {' '}to skip on resumed sessions.
+            </p>
+
             {/* Debug Info Display */}
             {debugInfo && (
               <div

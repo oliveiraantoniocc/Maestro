@@ -437,6 +437,26 @@ Each task executes in a completely fresh AI session with its own unique session 
 
 This isolation is critical for playbooks with `Reset on Completion` documents that loop indefinitely. Without it, the AI might "remember" completing a task and skip re-execution on subsequent loops.
 
+### Environment Variables {#environment-variables}
+
+Maestro sets environment variables that your agent hooks can use to customize behavior:
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `MAESTRO_SESSION_RESUMED` | `1` | Set when resuming an existing session (not set for new sessions) |
+
+**Example: Conditional Hook Execution**
+
+Since Maestro spawns a new agent process for each message (batch mode), agent "session start" hooks will run on every turn. Use `MAESTRO_SESSION_RESUMED` to skip hooks on resumed sessions:
+
+```bash
+# In your agent's session start hook
+[ "$MAESTRO_SESSION_RESUMED" = "1" ] && exit 0
+# ... rest of your hook logic for new sessions only
+```
+
+This works with any agent provider (Claude Code, Codex, OpenCode) since the environment variable is set by Maestro before spawning the agent process.
+
 ### History & Tracking
 
 Each completed task is logged to the History panel with:
