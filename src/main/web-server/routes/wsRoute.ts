@@ -172,9 +172,10 @@ export class WsRoute {
       // Send current AutoRun states for all sessions
       if (this.callbacks.getAutoRunStates) {
         const autoRunStates = this.callbacks.getAutoRunStates();
+        logger.info(`Sending initial AutoRun states to new client: ${autoRunStates.size} active sessions`, LOG_CONTEXT);
         autoRunStates.forEach((state, sid) => {
           if (state.isRunning) {
-            logger.debug(`Sending initial AutoRun state for session ${sid}`, LOG_CONTEXT);
+            logger.info(`Sending initial AutoRun state for session ${sid}: tasks=${state.completedTasks}/${state.totalTasks}`, LOG_CONTEXT);
             connection.socket.send(JSON.stringify({
               type: 'autorun_state',
               sessionId: sid,

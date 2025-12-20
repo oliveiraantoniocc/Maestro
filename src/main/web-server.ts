@@ -716,8 +716,13 @@ export class WebServer {
     // Store state locally for new clients connecting later
     if (state && state.isRunning) {
       this.autoRunStates.set(sessionId, state);
+      logger.info(`AutoRun state stored for session ${sessionId}: tasks=${state.completedTasks}/${state.totalTasks} (total stored: ${this.autoRunStates.size})`, LOG_CONTEXT);
     } else {
+      const wasStored = this.autoRunStates.has(sessionId);
       this.autoRunStates.delete(sessionId);
+      if (wasStored) {
+        logger.info(`AutoRun state removed for session ${sessionId} (total stored: ${this.autoRunStates.size})`, LOG_CONTEXT);
+      }
     }
     this.broadcastService.broadcastAutoRunState(sessionId, state);
   }

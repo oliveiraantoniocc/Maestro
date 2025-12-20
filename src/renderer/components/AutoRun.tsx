@@ -955,10 +955,13 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
 
     // Command-E to toggle between edit and preview (without Shift)
     // Cmd+Shift+E is allowed to propagate to global handler for "Toggle Auto Run Expanded"
+    // Skip if edit mode is locked (during Auto Run) - matches button disabled state
     if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
-      toggleMode();
+      if (!isLocked) {
+        toggleMode();
+      }
       return;
     }
 
@@ -1159,10 +1162,13 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
       onKeyDown={(e) => {
         // CMD+E to toggle edit/preview (without Shift)
         // Cmd+Shift+E is allowed to propagate to global handler for "Toggle Auto Run Expanded"
+        // Skip if edit mode is locked (during Auto Run) - matches button disabled state
         if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
           e.preventDefault();
           e.stopPropagation();
-          toggleMode();
+          if (!isLocked) {
+            toggleMode();
+          }
         }
         // CMD+F to open search (works in both modes from container)
         // Only intercept Cmd+F (without Shift) - let Cmd+Shift+F propagate to global "Go to Files" handler
@@ -1566,10 +1572,13 @@ const AutoRunInner = forwardRef<AutoRunHandle, AutoRunProps>(function AutoRunInn
             onKeyDown={(e) => {
               // CMD+E to toggle edit/preview (without Shift)
               // Cmd+Shift+E is allowed to propagate to global handler for "Toggle Auto Run Expanded"
+              // Skip if edit mode is locked (during Auto Run) - matches button disabled state
               if ((e.metaKey || e.ctrlKey) && e.key === 'e' && !e.shiftKey) {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleMode();
+                if (!isLocked) {
+                  toggleMode();
+                }
               }
               // Cmd+F to open search in preview mode (without Shift)
               // Cmd+Shift+F is allowed to propagate to global handler for "Go to Files"

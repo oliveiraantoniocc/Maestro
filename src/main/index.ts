@@ -806,6 +806,7 @@ function setupIpcHandlers() {
   });
 
   // Broadcast AutoRun state to web clients (called when batch processing state changes)
+  // Always store state even if no clients are connected, so new clients get initial state
   ipcMain.handle('web:broadcastAutoRunState', async (_, sessionId: string, state: {
     isRunning: boolean;
     totalTasks: number;
@@ -813,7 +814,9 @@ function setupIpcHandlers() {
     currentTaskIndex: number;
     isStopping?: boolean;
   } | null) => {
-    if (webServer && webServer.getWebClientCount() > 0) {
+    if (webServer) {
+      // Always call broadcastAutoRunState - it stores the state for new clients
+      // and broadcasts to any currently connected clients
       webServer.broadcastAutoRunState(sessionId, state);
       return true;
     }

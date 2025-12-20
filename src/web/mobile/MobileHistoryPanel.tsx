@@ -17,7 +17,8 @@ import { useThemeColors } from '../components/ThemeProvider';
 import { triggerHaptic, HAPTIC_PATTERNS } from './constants';
 import { buildApiUrl } from '../utils/config';
 import { webLogger } from '../utils/logger';
-import { HistoryEntry, HistoryEntryType } from '../../shared/types';
+import { HistoryEntry } from '../../shared/types';
+import { useSwipeGestures } from '../hooks/useSwipeGestures';
 
 /**
  * Format timestamp for display
@@ -258,14 +259,38 @@ function HistoryCard({ entry, onSelect }: HistoryCardProps) {
 
 /**
  * History detail view component (full-screen)
+ * Supports swipe left/right navigation on mobile and arrow key navigation on desktop/iPad
  */
 interface HistoryDetailViewProps {
   entry: HistoryEntry;
   onClose: () => void;
+  /** Current index in the filtered list (0-based) */
+  currentIndex: number;
+  /** Total number of entries in the filtered list */
+  totalCount: number;
+  /** Navigate to a specific index */
+  onNavigate: (index: number) => void;
 }
 
-function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
+function HistoryDetailView({ entry, onClose, currentIndex, totalCount, onNavigate }: HistoryDetailViewProps) {
   const colors = useThemeColors();
+
+  const canGoNext = currentIndex < totalCount - 1;
+  const canGoPrev = currentIndex > 0;
+
+  // Swipe gestures for mobile navigation
+  const { handlers: swipeHandlers, offsetX, isSwiping } = useSwipeGestures({
+    onSwipeLeft: canGoNext ? () => {
+      triggerHaptic(HAPTIC_PATTERNS.tap);
+      onNavigate(currentIndex + 1);
+    } : undefined,
+    onSwipeRight: canGoPrev ? () => {
+      triggerHaptic(HAPTIC_PATTERNS.tap);
+      onNavigate(currentIndex - 1);
+    } : undefined,
+    trackOffset: true,
+    threshold: 50,
+  });
 
   // Get pill color based on type
   const getPillColor = () => {
@@ -281,21 +306,41 @@ function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
   const rawResponse = entry.fullResponse || entry.summary || '';
   const cleanResponse = rawResponse.replace(/\x1b\[[0-9;]*m/g, '');
 
-  // Close on escape key
+  // Handle keyboard navigation (Escape to close, Arrow keys to navigate)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
+      } else if (e.key === 'ArrowLeft' && canGoPrev) {
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex - 1);
+      } else if (e.key === 'ArrowRight' && canGoNext) {
+        triggerHaptic(HAPTIC_PATTERNS.tap);
+        onNavigate(currentIndex + 1);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, onNavigate, currentIndex, canGoPrev, canGoNext]);
 
   const handleClose = useCallback(() => {
     triggerHaptic(HAPTIC_PATTERNS.tap);
     onClose();
   }, [onClose]);
+
+  const handlePrev = useCallback(() => {
+    if (canGoPrev) {
+      triggerHaptic(HAPTIC_PATTERNS.tap);
+      onNavigate(currentIndex - 1);
+    }
+  }, [canGoPrev, currentIndex, onNavigate]);
+
+  const handleNext = useCallback(() => {
+    if (canGoNext) {
+      triggerHaptic(HAPTIC_PATTERNS.tap);
+      onNavigate(currentIndex + 1);
+    }
+  }, [canGoNext, currentIndex, onNavigate]);
 
   return (
     <div
@@ -324,10 +369,71 @@ function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
           backgroundColor: colors.bgSidebar,
           minHeight: '56px',
           flexShrink: 0,
-          gap: '12px',
+          gap: '8px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+        {/* Left: Navigation arrows */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <button
+            onClick={handlePrev}
+            disabled={!canGoPrev}
+            style={{
+              padding: '8px',
+              borderRadius: '8px',
+              backgroundColor: canGoPrev ? colors.bgMain : 'transparent',
+              border: canGoPrev ? `1px solid ${colors.border}` : 'none',
+              color: canGoPrev ? colors.textMain : colors.textDim + '40',
+              cursor: canGoPrev ? 'pointer' : 'default',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="Previous entry"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            onClick={handleNext}
+            disabled={!canGoNext}
+            style={{
+              padding: '8px',
+              borderRadius: '8px',
+              backgroundColor: canGoNext ? colors.bgMain : 'transparent',
+              border: canGoNext ? `1px solid ${colors.border}` : 'none',
+              color: canGoNext ? colors.textMain : colors.textDim + '40',
+              cursor: canGoNext ? 'pointer' : 'default',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="Next entry"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+          {/* Position indicator */}
+          <span
+            style={{
+              fontSize: '12px',
+              color: colors.textDim,
+              fontFamily: 'monospace',
+              marginLeft: '4px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {currentIndex + 1} / {totalCount}
+          </span>
+        </div>
+
+        {/* Center: Entry info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, justifyContent: 'center' }}>
           {/* Success/Failure Indicator for AUTO entries */}
           {entry.type === 'AUTO' && entry.success !== undefined && (
             <span
@@ -501,14 +607,18 @@ function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
         </div>
       )}
 
-      {/* Content */}
+      {/* Content - with swipe gestures for navigation */}
       <div
+        {...swipeHandlers}
         style={{
           flex: 1,
           overflowY: 'auto',
           overflowX: 'hidden',
           padding: '16px',
           paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+          transform: `translateX(${offsetX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.2s ease-out',
+          touchAction: 'pan-y', // Allow vertical scrolling, capture horizontal swipes
         }}
       >
         <pre
@@ -525,6 +635,42 @@ function HistoryDetailView({ entry, onClose }: HistoryDetailViewProps) {
           {cleanResponse}
         </pre>
       </div>
+
+      {/* Swipe hint overlays */}
+      {isSwiping && offsetX > 20 && canGoPrev && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            padding: '16px',
+            color: colors.accent,
+            opacity: Math.min(1, offsetX / 50),
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </div>
+      )}
+      {isSwiping && offsetX < -20 && canGoNext && (
+        <div
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            padding: '16px',
+            color: colors.accent,
+            opacity: Math.min(1, Math.abs(offsetX) / 50),
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </div>
+      )}
 
       {/* Animation keyframes */}
       <style>{`
@@ -590,7 +736,7 @@ export function MobileHistoryPanel({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>(initialFilter);
-  const [selectedEntry, setSelectedEntry] = useState<HistoryEntry | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [isSearchOpen, setIsSearchOpen] = useState(initialSearchOpen);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -690,15 +836,25 @@ export function MobileHistoryPanel({
     searchInputRef.current?.focus();
   }, [isSearchOpen, onSearchChange]);
 
-  // Handle entry selection
+  // Handle entry selection - find the index in filtered entries
   const handleSelectEntry = useCallback((entry: HistoryEntry) => {
-    setSelectedEntry(entry);
-  }, []);
+    const index = filteredEntries.findIndex(e => e.id === entry.id);
+    if (index !== -1) {
+      setSelectedIndex(index);
+    }
+  }, [filteredEntries]);
 
   // Handle closing detail view
   const handleCloseDetail = useCallback(() => {
-    setSelectedEntry(null);
+    setSelectedIndex(null);
   }, []);
+
+  // Handle navigating to a specific index
+  const handleNavigate = useCallback((index: number) => {
+    if (index >= 0 && index < filteredEntries.length) {
+      setSelectedIndex(index);
+    }
+  }, [filteredEntries.length]);
 
   // Handle close button
   const handleClose = useCallback(() => {
@@ -706,16 +862,19 @@ export function MobileHistoryPanel({
     onClose();
   }, [onClose]);
 
+  // Get the currently selected entry
+  const selectedEntry = selectedIndex !== null ? filteredEntries[selectedIndex] : null;
+
   // Close on escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !selectedEntry) {
+      if (e.key === 'Escape' && selectedIndex === null) {
         onClose();
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, selectedEntry]);
+  }, [onClose, selectedIndex]);
 
   // Count entries by type
   const autoCount = entries.filter((e) => e.type === 'AUTO').length;
@@ -1084,8 +1243,14 @@ export function MobileHistoryPanel({
       </div>
 
       {/* Detail view (overlays the list) */}
-      {selectedEntry && (
-        <HistoryDetailView entry={selectedEntry} onClose={handleCloseDetail} />
+      {selectedEntry && selectedIndex !== null && (
+        <HistoryDetailView
+          entry={selectedEntry}
+          onClose={handleCloseDetail}
+          currentIndex={selectedIndex}
+          totalCount={filteredEntries.length}
+          onNavigate={handleNavigate}
+        />
       )}
     </>
   );
