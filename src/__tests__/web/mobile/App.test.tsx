@@ -59,7 +59,12 @@ let mockHandlers: Record<string, (...args: unknown[]) => void> = {};
 
 vi.mock('../../../web/hooks/useWebSocket', () => ({
   useWebSocket: ({ handlers }: { handlers: Record<string, (...args: unknown[]) => void> }) => {
-    mockHandlers = handlers;
+    mockHandlers = Object.fromEntries(
+      Object.entries(handlers).map(([key, handler]) => [
+        key,
+        (...args: unknown[]) => act(() => handler(...args)),
+      ])
+    );
     return {
       state: mockWebSocketState,
       connect: mockConnect,
@@ -481,6 +486,7 @@ describe('MobileApp', () => {
   let originalFetch: typeof global.fetch;
   let originalVisibilityState: PropertyDescriptor | undefined;
   let originalInnerHeight: PropertyDescriptor | undefined;
+  let originalReadyState: PropertyDescriptor | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -507,6 +513,7 @@ describe('MobileApp', () => {
     // Store original properties
     originalVisibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState');
     originalInnerHeight = Object.getOwnPropertyDescriptor(window, 'innerHeight');
+    originalReadyState = Object.getOwnPropertyDescriptor(document, 'readyState');
 
     // Set default inner height
     Object.defineProperty(window, 'innerHeight', {
@@ -514,6 +521,13 @@ describe('MobileApp', () => {
       writable: true,
       configurable: true,
     });
+
+    Object.defineProperty(document, 'readyState', {
+      value: 'complete',
+      configurable: true,
+    });
+
+    (window as any).__MAESTRO_CONFIG__ = {};
 
     // Reset mock function return values
     mockIsOffline.mockReturnValue(false);
@@ -531,6 +545,9 @@ describe('MobileApp', () => {
     }
     if (originalInnerHeight !== undefined) {
       Object.defineProperty(window, 'innerHeight', originalInnerHeight);
+    }
+    if (originalReadyState !== undefined) {
+      Object.defineProperty(document, 'readyState', originalReadyState);
     }
   });
 
@@ -735,6 +752,9 @@ describe('MobileApp', () => {
 
     it('calls connect on mount', () => {
       render(<MobileApp />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
       expect(mockConnect).toHaveBeenCalled();
     });
 
@@ -802,6 +822,10 @@ describe('MobileApp', () => {
       mockWebSocketState = 'disconnected';
 
       render(<MobileApp />);
+
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
 
       fireEvent.click(screen.getByText('Retry Now'));
 
@@ -1843,6 +1867,10 @@ describe('MobileApp', () => {
 
       render(<MobileApp />);
 
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
       await act(async () => {
@@ -1856,6 +1884,10 @@ describe('MobileApp', () => {
       mockWebSocketState = 'connected';
 
       render(<MobileApp />);
+
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
 
       expect(mockConnect).toHaveBeenCalledTimes(1);
 
@@ -1872,6 +1904,10 @@ describe('MobileApp', () => {
       mockWebSocketState = 'disconnected';
 
       render(<MobileApp />);
+
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
 
       expect(mockConnect).toHaveBeenCalledTimes(1);
 

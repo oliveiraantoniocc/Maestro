@@ -86,6 +86,15 @@ Your responses will be shared with the moderator and other participants.`;
 }
 
 /**
+ * Session-specific overrides for participant agent configuration.
+ */
+export interface SessionOverrides {
+  customModel?: string;
+  customArgs?: string;
+  customEnvVars?: Record<string, string>;
+}
+
+/**
  * Adds a participant to a group chat and spawns their agent session.
  *
  * @param groupChatId - The ID of the group chat
@@ -95,7 +104,8 @@ Your responses will be shared with the moderator and other participants.`;
  * @param cwd - Working directory for the agent (defaults to home directory)
  * @param agentDetector - Optional agent detector for resolving agent paths
  * @param agentConfigValues - Optional agent config values (from config store)
- * @param customEnvVars - Optional custom environment variables for the agent
+ * @param customEnvVars - Optional custom environment variables for the agent (deprecated, use sessionOverrides)
+ * @param sessionOverrides - Optional session-specific overrides (customModel, customArgs, customEnvVars)
  * @returns The created participant
  */
 export async function addParticipant(
@@ -106,7 +116,8 @@ export async function addParticipant(
   cwd: string = process.env.HOME || '/tmp',
   agentDetector?: AgentDetector,
   agentConfigValues?: Record<string, any>,
-  customEnvVars?: Record<string, string>
+  customEnvVars?: Record<string, string>,
+  sessionOverrides?: SessionOverrides
 ): Promise<GroupChatParticipant> {
   console.log(`[GroupChat:Debug] ========== ADD PARTICIPANT ==========`);
   console.log(`[GroupChat:Debug] Group Chat ID: ${groupChatId}`);
@@ -153,15 +164,21 @@ export async function addParticipant(
   }
 
   const prompt = getParticipantSystemPrompt(name, chat.name, chat.logPath);
+  // Note: Don't pass modelId to buildAgentArgs - it will be handled by applyAgentConfigOverrides
+  // via sessionCustomModel to avoid duplicate --model args
   const baseArgs = buildAgentArgs(agentConfig, {
     baseArgs: args,
     prompt,
     cwd,
     readOnlyMode: false,
   });
+  // Merge customEnvVars with sessionOverrides.customEnvVars (sessionOverrides takes precedence)
+  const effectiveEnvVars = sessionOverrides?.customEnvVars ?? customEnvVars;
   const configResolution = applyAgentConfigOverrides(agentConfig, baseArgs, {
     agentConfigValues: agentConfigValues || {},
-    sessionCustomEnvVars: customEnvVars,
+    sessionCustomModel: sessionOverrides?.customModel,
+    sessionCustomArgs: sessionOverrides?.customArgs,
+    sessionCustomEnvVars: effectiveEnvVars,
   });
 
   console.log(`[GroupChat:Debug] Command: ${command}`);
@@ -182,7 +199,7 @@ export async function addParticipant(
     readOnlyMode: false, // Participants can make changes
     prompt,
     contextWindow: getContextWindowValue(agentConfig, agentConfigValues || {}),
-    customEnvVars: configResolution.effectiveCustomEnvVars ?? customEnvVars,
+    customEnvVars: configResolution.effectiveCustomEnvVars ?? effectiveEnvVars,
   });
 
   console.log(`[GroupChat:Debug] Spawn result: ${JSON.stringify(result)}`);

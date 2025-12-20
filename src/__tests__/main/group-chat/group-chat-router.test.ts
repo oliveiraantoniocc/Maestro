@@ -357,7 +357,7 @@ describe('group-chat-router', () => {
       const chat = await createTestChatWithModerator('Forward Test');
       await addParticipant(chat.id, 'Client', 'claude-code', mockProcessManager);
 
-      await routeModeratorResponse(chat.id, '@Client: Please implement the login form', mockProcessManager);
+      await routeModeratorResponse(chat.id, '@Client: Please implement the login form', mockProcessManager, mockAgentDetector);
 
       const spawnCall = mockProcessManager.spawn.mock.calls.find(call =>
         call[0]?.prompt?.includes('login form')
@@ -380,7 +380,7 @@ describe('group-chat-router', () => {
       const client = await addParticipant(chat.id, 'Client', 'claude-code', mockProcessManager);
       const server = await addParticipant(chat.id, 'Server', 'claude-code', mockProcessManager);
 
-      await routeModeratorResponse(chat.id, '@Client and @Server: Coordinate on API', mockProcessManager);
+      await routeModeratorResponse(chat.id, '@Client and @Server: Coordinate on API', mockProcessManager, mockAgentDetector);
 
       const spawnCalls = mockProcessManager.spawn.mock.calls;
       const clientSpawn = spawnCalls.find(call => call[0]?.prompt?.includes('Client'));
@@ -397,7 +397,7 @@ describe('group-chat-router', () => {
       // Clear the write mock after setup
       mockProcessManager.spawn.mockClear();
 
-      await routeModeratorResponse(chat.id, '@Unknown: This should not route', mockProcessManager);
+      await routeModeratorResponse(chat.id, '@Unknown: This should not route', mockProcessManager, mockAgentDetector);
 
       // Should not spawn any participant (since Unknown doesn't exist)
       expect(mockProcessManager.spawn).not.toHaveBeenCalled();

@@ -88,7 +88,12 @@ beforeEach(() => {
   (window.maestro.logger as Record<string, unknown>).getLogs = vi.fn().mockResolvedValue([]);
   (window.maestro.logger as Record<string, unknown>).clearLogs = vi.fn().mockResolvedValue(undefined);
   (window.maestro.logger as Record<string, unknown>).onNewLog = vi.fn().mockReturnValue(() => {});
-  (window.maestro.logger as Record<string, unknown>).getMaxLogBuffer = vi.fn().mockResolvedValue(1000);
+  (window.maestro.logger as Record<string, unknown>).getMaxLogBuffer = vi.fn(() => ({
+    then: (cb: (value: number) => void) => {
+      cb(1000);
+      return Promise.resolve(1000);
+    },
+  }));
 });
 
 afterEach(() => {
@@ -142,7 +147,9 @@ describe('LogViewer', () => {
     it('should load logs on mount', async () => {
       render(<LogViewer theme={mockTheme} onClose={vi.fn()} />);
 
-      expect(getMockGetLogs()).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(getMockGetLogs()).toHaveBeenCalled();
+      });
     });
 
     it('should display empty state when no logs', async () => {

@@ -420,9 +420,11 @@ export class OpenCodeOutputParser implements AgentOutputParser {
     }
 
     // Non-zero exit with no recognized pattern - treat as crash
+    // Include stderr in the message if available for better debugging
+    const stderrPreview = stderr?.trim() ? `: ${stderr.trim().split('\n')[0].substring(0, 200)}` : '';
     return {
       type: 'agent_crashed',
-      message: `Agent exited with code ${exitCode}`,
+      message: `Agent exited with code ${exitCode}${stderrPreview}`,
       recoverable: true,
       agentId: this.agentId,
       timestamp: Date.now(),

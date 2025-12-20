@@ -359,7 +359,7 @@ describe('batch-processor', () => {
       await collectEvents(runPlaybook(session, playbook, '/playbooks'));
 
       expect(spawnAgent).toHaveBeenCalled();
-      const promptArg = vi.mocked(spawnAgent).mock.calls[0][1];
+      const promptArg = vi.mocked(spawnAgent).mock.calls[0][2];
       expect(promptArg).toContain('Custom prompt for processing');
       expect(promptArg).toContain('My task');
     });
@@ -837,8 +837,8 @@ describe('batch-processor', () => {
       // First call is the main task (no session ID), second call is synopsis (with session ID)
       expect(spawnAgent).toHaveBeenCalled();
       const firstCall = vi.mocked(spawnAgent).mock.calls[0];
-      expect(firstCall[0]).toBe(session.cwd);
-      expect(firstCall[1]).toContain('Process the task in this session');
+      expect(firstCall[1]).toBe(session.cwd);
+      expect(firstCall[2]).toContain('Process the task in this session');
     });
 
     it('should include group name in template context', async () => {

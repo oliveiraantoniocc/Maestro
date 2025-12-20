@@ -273,7 +273,13 @@ export async function routeUserMessage(
             matchingSession.cwd,
             agentDetector,
             agentConfigValues,
-            customEnvVars
+            customEnvVars,
+            // Pass session-specific overrides (customModel, customArgs, customEnvVars from session)
+            {
+              customModel: matchingSession.customModel,
+              customArgs: matchingSession.customArgs,
+              customEnvVars: matchingSession.customEnvVars,
+            }
           );
           existingParticipantNames.add(participantName);
 
@@ -528,7 +534,13 @@ export async function routeModeratorResponse(
             matchingSession.cwd,
             agentDetector,
             agentConfigValues,
-            customEnvVars
+            customEnvVars,
+            // Pass session-specific overrides (customModel, customArgs, customEnvVars from session)
+            {
+              customModel: matchingSession.customModel,
+              customArgs: matchingSession.customArgs,
+              customEnvVars: matchingSession.customEnvVars,
+            }
           );
           existingParticipantNames.add(participantName);
 
@@ -626,12 +638,13 @@ Please respond to this request.${readOnly ? ' Remember: READ-ONLY mode is active
       console.log(`[GroupChat:Debug] Generated session ID: ${sessionId}`);
 
       const agentConfigValues = getAgentConfigCallback?.(participant.agentId) || {};
+      // Note: Don't pass modelId to buildAgentArgs - it will be handled by applyAgentConfigOverrides
+      // via sessionCustomModel to avoid duplicate --model args
       const baseArgs = buildAgentArgs(agent, {
         baseArgs: [...agent.args],
         prompt: participantPrompt,
         cwd,
         readOnlyMode: readOnly ?? false,
-        modelId: matchingSession?.customModel,
         agentSessionId: participant.agentSessionId,
       });
       const configResolution = applyAgentConfigOverrides(agent, baseArgs, {
@@ -651,6 +664,8 @@ Please respond to this request.${readOnly ? ' Remember: READ-ONLY mode is active
         const spawnArgs = configResolution.args;
         console.log(`[GroupChat:Debug] Spawn command: ${spawnCommand}`);
         console.log(`[GroupChat:Debug] Spawn args: ${JSON.stringify(spawnArgs)}`);
+        console.log(`[GroupChat:Debug] Session customModel: ${matchingSession?.customModel || '(none)'}`);
+        console.log(`[GroupChat:Debug] Config model source: ${configResolution.modelSource || 'unknown'}`);
         console.log(`[GroupChat:Debug] Prompt length: ${participantPrompt.length}`);
         console.log(`[GroupChat:Debug] CustomEnvVars: ${JSON.stringify(configResolution.effectiveCustomEnvVars || {})}`);
 

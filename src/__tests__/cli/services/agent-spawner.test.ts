@@ -700,7 +700,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should spawn Claude with correct arguments', async () => {
-      const resultPromise = spawnAgent('/project/path', 'Test prompt');
+      const resultPromise = spawnAgent('claude-code', '/project/path', 'Test prompt');
 
       // Let the async operations start
       await new Promise(resolve => setTimeout(resolve, 0));
@@ -736,7 +736,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should use --resume for existing session', async () => {
-      const resultPromise = spawnAgent('/project/path', 'Test prompt', 'existing-session-id');
+      const resultPromise = spawnAgent('claude-code', '/project/path', 'Test prompt', 'existing-session-id');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -755,7 +755,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should parse result from stdout', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -771,7 +771,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should capture session_id from stdout', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -788,7 +788,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should parse usage statistics from modelUsage', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -823,7 +823,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should parse usage statistics from usage field', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -848,7 +848,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should aggregate usage from multiple models', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -878,7 +878,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should return error on non-zero exit code', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -894,7 +894,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should return error when no result and non-zero exit', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
       mockChild.emit('close', 1);
@@ -906,7 +906,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should handle spawn error', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
       mockChild.emit('error', new Error('spawn ENOENT'));
@@ -919,7 +919,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should close stdin immediately', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -932,7 +932,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should handle partial JSON lines (buffering)', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -949,7 +949,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should ignore non-JSON lines', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -967,7 +967,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should only capture first result', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -983,7 +983,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should only capture first session_id', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -999,7 +999,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should preserve session_id and usageStats on error', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -1017,7 +1017,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should handle empty lines in output', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -1031,7 +1031,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should handle success without result field', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -1045,7 +1045,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should include expanded PATH in environment', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
 
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -1065,7 +1065,7 @@ Some text with [x] in it that's not a checkbox
 
     it('should generate unique session-id for each spawn', async () => {
       // First spawn
-      const promise1 = spawnAgent('/project', 'prompt1');
+      const promise1 = spawnAgent('claude-code', '/project', 'prompt1');
       await new Promise(resolve => setTimeout(resolve, 0));
       const args1 = mockSpawn.mock.calls[0][1];
 
@@ -1081,7 +1081,7 @@ Some text with [x] in it that's not a checkbox
       mockSpawn.mockReturnValue(mockChild);
 
       // Second spawn
-      const promise2 = spawnAgent('/project', 'prompt2');
+      const promise2 = spawnAgent('claude-code', '/project', 'prompt2');
       await new Promise(resolve => setTimeout(resolve, 0));
       const args2 = mockSpawn.mock.calls[0][1];
 
@@ -1112,7 +1112,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should include homebrew paths', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
       await new Promise(resolve => setTimeout(resolve, 0));
 
       const pathEnv = mockSpawn.mock.calls[0][2].env.PATH;
@@ -1125,7 +1125,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should include user home paths', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
       await new Promise(resolve => setTimeout(resolve, 0));
 
       const pathEnv = mockSpawn.mock.calls[0][2].env.PATH;
@@ -1140,7 +1140,7 @@ Some text with [x] in it that's not a checkbox
     });
 
     it('should include system paths', async () => {
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
       await new Promise(resolve => setTimeout(resolve, 0));
 
       const pathEnv = mockSpawn.mock.calls[0][2].env.PATH;
@@ -1161,7 +1161,7 @@ Some text with [x] in it that's not a checkbox
       const originalPath = process.env.PATH;
       process.env.PATH = '/opt/homebrew/bin:/usr/bin';
 
-      const resultPromise = spawnAgent('/project', 'prompt');
+      const resultPromise = spawnAgent('claude-code', '/project', 'prompt');
       await new Promise(resolve => setTimeout(resolve, 0));
 
       const pathEnv = mockSpawn.mock.calls[0][2].env.PATH;
