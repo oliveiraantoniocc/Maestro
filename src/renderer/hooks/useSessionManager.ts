@@ -8,10 +8,28 @@ const MAX_PERSISTED_LOGS_PER_TAB = 100;
 
 /**
  * Prepare a session for loading by resetting runtime-only fields.
+ * This ensures sessions don't get stuck in busy state after app restart,
+ * since underlying processes are gone after restart.
  */
 const prepareSessionForLoad = (session: Session): Session => {
+  // Reset tab states - processes don't survive app restart
+  const resetTabs = session.aiTabs?.map(tab => ({
+    ...tab,
+    state: 'idle' as const,
+    thinkingStartTime: undefined,
+  })) || [];
+
   return {
     ...session,
+    // Reset session state - processes don't survive app restart
+    state: 'idle',
+    busySource: undefined,
+    thinkingStartTime: undefined,
+    currentCycleTokens: undefined,
+    currentCycleBytes: undefined,
+    statusMessage: undefined,
+    // Reset tabs with idle state
+    aiTabs: resetTabs,
     // closedTabHistory is runtime-only and should not be persisted
     // Always reset to empty array on load
     closedTabHistory: [],

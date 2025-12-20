@@ -178,8 +178,8 @@ export function AgentErrorModal({
           {new Date(error.timestamp).toLocaleTimeString()}
         </div>
 
-        {/* Recovery hint for recoverable errors */}
-        {error.recoverable && (
+        {/* Recovery hint - different message based on whether there are actions */}
+        {error.recoverable && recoveryActions.length > 0 && (
           <div
             className="text-xs p-3 rounded"
             style={{
@@ -189,6 +189,18 @@ export function AgentErrorModal({
           >
             <span className="font-medium">Tip:</span> This error can be resolved.
             Choose a recovery action below.
+          </div>
+        )}
+        {error.recoverable && recoveryActions.length === 0 && (
+          <div
+            className="text-xs p-3 rounded"
+            style={{
+              backgroundColor: `${errorColor}15`,
+              color: theme.colors.textMain,
+            }}
+          >
+            <span className="font-medium">Tip:</span> Simply send another message to
+            continue, or start a new session.
           </div>
         )}
 
@@ -223,48 +235,53 @@ export function AgentErrorModal({
         )}
       </div>
 
-      {/* Recovery Actions */}
-      <div className="mt-6 space-y-2">
-        {recoveryActions.map((action, index) => (
-          <button
-            key={action.id}
-            ref={action.primary || (!primaryAction && index === 0) ? primaryButtonRef : undefined}
-            type="button"
-            onClick={action.onClick}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded border transition-colors text-left ${
-              action.primary
-                ? 'hover:brightness-110'
-                : 'hover:bg-white/5'
-            }`}
-            style={{
-              backgroundColor: action.primary ? theme.colors.accent : 'transparent',
-              borderColor: action.primary ? theme.colors.accent : theme.colors.border,
-              color: action.primary ? theme.colors.accentForeground : theme.colors.textMain,
-            }}
-          >
-            {action.icon || <RefreshCw className="w-4 h-4 shrink-0" />}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium">{action.label}</div>
-              {action.description && (
-                <div
-                  className="text-xs mt-0.5 truncate"
-                  style={{
-                    color: action.primary
-                      ? `${theme.colors.accentForeground}99`
-                      : theme.colors.textDim,
-                  }}
-                >
-                  {action.description}
-                </div>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
+      {/* Recovery Actions - only show if there are actions */}
+      {recoveryActions.length > 0 && (
+        <div className="mt-6 space-y-2">
+          {recoveryActions.map((action, index) => (
+            <button
+              key={action.id}
+              ref={action.primary || (!primaryAction && index === 0) ? primaryButtonRef : undefined}
+              type="button"
+              onClick={action.onClick}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded border transition-colors text-left ${
+                action.primary
+                  ? 'hover:brightness-110'
+                  : 'hover:bg-white/5'
+              }`}
+              style={{
+                backgroundColor: action.primary ? theme.colors.accent : 'transparent',
+                borderColor: action.primary ? theme.colors.accent : theme.colors.border,
+                color: action.primary ? theme.colors.accentForeground : theme.colors.textMain,
+              }}
+            >
+              {action.icon || <RefreshCw className="w-4 h-4 shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">{action.label}</div>
+                {action.description && (
+                  <div
+                    className="text-xs mt-0.5 truncate"
+                    style={{
+                      color: action.primary
+                        ? `${theme.colors.accentForeground}99`
+                        : theme.colors.textDim,
+                    }}
+                  >
+                    {action.description}
+                  </div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Dismiss option */}
       {dismissible && (
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: theme.colors.border }}>
+        <div
+          className={recoveryActions.length > 0 ? 'mt-4 pt-4 border-t' : 'mt-6'}
+          style={{ borderColor: recoveryActions.length > 0 ? theme.colors.border : undefined }}
+        >
           <button
             type="button"
             onClick={onDismiss}

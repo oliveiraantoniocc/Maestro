@@ -135,26 +135,8 @@ function getRecoveryActionsForError(
       break;
 
     case 'agent_crashed':
-      // Agent crashed - offer restart or new session
-      if (options.onRestartAgent) {
-        actions.push({
-          id: 'restart',
-          label: 'Restart Agent',
-          description: 'Restart the agent process',
-          primary: true,
-          icon: <RotateCcw className="w-4 h-4" />,
-          onClick: options.onRestartAgent,
-        });
-      }
-      if (options.onNewSession) {
-        actions.push({
-          id: 'new-session',
-          label: 'Start New Session',
-          description: 'Begin a fresh conversation',
-          icon: <MessageSquarePlus className="w-4 h-4" />,
-          onClick: options.onNewSession,
-        });
-      }
+      // Agent crashed - no action buttons needed
+      // User can simply send another message to continue or start fresh
       break;
 
     case 'permission_denied':

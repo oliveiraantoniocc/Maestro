@@ -444,7 +444,8 @@ describe('AutoRunLightbox', () => {
   // Delete Key - Delete Confirmation
   // ===========================================================================
   describe('Delete Key - Delete Functionality', () => {
-    it('should call onDelete on Delete key', () => {
+    it('should show confirm modal on Delete key and call onDelete after confirmation', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const props = createDefaultProps({ onDelete });
       renderWithProviders(<AutoRunLightbox {...props} />);
@@ -452,16 +453,31 @@ describe('AutoRunLightbox', () => {
       const backdrop = document.querySelector('.fixed.inset-0.z-50');
       fireEvent.keyDown(backdrop!, { key: 'Delete' });
 
+      // Confirm modal should appear
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      expect(confirmButton).toBeInTheDocument();
+
+      // Click confirm to trigger delete
+      fireEvent.click(confirmButton);
+
       expect(onDelete).toHaveBeenCalledWith('image1.png');
     });
 
-    it('should call onDelete on Backspace key', () => {
+    it('should show confirm modal on Backspace key and call onDelete after confirmation', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const props = createDefaultProps({ onDelete });
       renderWithProviders(<AutoRunLightbox {...props} />);
 
       const backdrop = document.querySelector('.fixed.inset-0.z-50');
       fireEvent.keyDown(backdrop!, { key: 'Backspace' });
+
+      // Confirm modal should appear
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      expect(confirmButton).toBeInTheDocument();
+
+      // Click confirm to trigger delete
+      fireEvent.click(confirmButton);
 
       expect(onDelete).toHaveBeenCalledWith('image1.png');
     });
@@ -505,17 +521,23 @@ describe('AutoRunLightbox', () => {
   // Delete Button Click
   // ===========================================================================
   describe('Delete Button Click', () => {
-    it('should call onDelete when delete button is clicked', () => {
+    it('should show confirm modal and call onDelete after confirmation', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const props = createDefaultProps({ onDelete });
       renderWithProviders(<AutoRunLightbox {...props} />);
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
 
+      // Confirm modal should appear
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
+
       expect(onDelete).toHaveBeenCalledWith('image1.png');
     });
 
-    it('should stop propagation on delete button click', () => {
+    it('should stop propagation on delete button click and show confirm modal', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onClose = vi.fn();
       const props = createDefaultProps({ onDelete, onClose });
@@ -525,10 +547,16 @@ describe('AutoRunLightbox', () => {
 
       // onClose should NOT be called because stopPropagation prevents backdrop click
       expect(onClose).not.toHaveBeenCalled();
+
+      // Confirm modal should appear - click confirm to complete delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
+
       expect(onDelete).toHaveBeenCalled();
     });
 
-    it('should navigate to next image after deleting when not last', () => {
+    it('should navigate to next image after confirming delete when not last', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onNavigate = vi.fn();
       const props = createDefaultProps({ onDelete, onNavigate });
@@ -536,11 +564,16 @@ describe('AutoRunLightbox', () => {
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
 
+      // Confirm the delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
+
       // After deleting image1.png, should navigate to image2.png (same index in new list)
       expect(onNavigate).toHaveBeenCalledWith('image2.png');
     });
 
-    it('should navigate to previous image after deleting when last', () => {
+    it('should navigate to previous image after confirming delete when last', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onNavigate = vi.fn();
       const props = createDefaultProps({
@@ -552,11 +585,16 @@ describe('AutoRunLightbox', () => {
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
 
+      // Confirm the delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
+
       // After deleting image3.png (last), should navigate to image2.png
       expect(onNavigate).toHaveBeenCalledWith('image2.png');
     });
 
-    it('should close lightbox after deleting only image', () => {
+    it('should close lightbox after confirming delete of only image', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onClose = vi.fn();
       const singleAttachment = ['image1.png'];
@@ -569,6 +607,10 @@ describe('AutoRunLightbox', () => {
       renderWithProviders(<AutoRunLightbox {...props} />);
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
+
+      // Confirm the delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
 
       expect(onDelete).toHaveBeenCalledWith('image1.png');
       expect(onClose).toHaveBeenCalled();
@@ -1102,7 +1144,8 @@ describe('AutoRunLightbox', () => {
   // Delete After Navigation State
   // ===========================================================================
   describe('Delete After Navigation State', () => {
-    it('should correctly delete middle image and stay at same position', () => {
+    it('should correctly delete middle image and stay at same position after confirmation', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onNavigate = vi.fn();
       const props = createDefaultProps({
@@ -1114,11 +1157,16 @@ describe('AutoRunLightbox', () => {
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
 
+      // Confirm the delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
+
       // After deleting image2.png (index 1), should navigate to image3.png (new index 1)
       expect(onNavigate).toHaveBeenCalledWith('image3.png');
     });
 
-    it('should handle delete when filename not found in list', () => {
+    it('should handle delete when filename not found in list after confirmation', async () => {
+      vi.useRealTimers(); // Need real timers for async findByRole
       const onDelete = vi.fn();
       const onNavigate = vi.fn();
       const props = createDefaultProps({
@@ -1131,6 +1179,10 @@ describe('AutoRunLightbox', () => {
       renderWithProviders(<AutoRunLightbox {...props} />);
 
       fireEvent.click(screen.getByTitle('Delete image (Delete key)'));
+
+      // Confirm the delete
+      const confirmButton = await screen.findByRole('button', { name: 'Confirm' });
+      fireEvent.click(confirmButton);
 
       // currentIndex is -1, which is >= totalImages - 1 (false for 3 images)
       // So it tries to navigate to newList[currentIndex] = newList[-1] which is undefined
