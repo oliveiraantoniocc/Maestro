@@ -1857,6 +1857,45 @@ function extractTextGeneric(rawOutput: string): string {
   return textParts.join('\n');
 }
 
+/**
+ * Parses a group chat participant session ID to extract groupChatId and participantName.
+ * Handles hyphenated participant names by matching against UUID or timestamp suffixes.
+ *
+ * Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
+ * Examples:
+ * - group-chat-abc123-participant-Claude-1702934567890
+ * - group-chat-abc123-participant-OpenCode-Ollama-550e8400-e29b-41d4-a716-446655440000
+ *
+ * @returns null if not a participant session ID, otherwise { groupChatId, participantName }
+ */
+function parseParticipantSessionId(sessionId: string): { groupChatId: string; participantName: string } | null {
+  // First check if this is a participant session ID at all
+  if (!sessionId.includes('-participant-')) {
+    return null;
+  }
+
+  // Try matching with UUID suffix first (36 chars: 8-4-4-4-12 format)
+  // UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  const uuidMatch = sessionId.match(/^group-chat-(.+)-participant-(.+)-([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i);
+  if (uuidMatch) {
+    return { groupChatId: uuidMatch[1], participantName: uuidMatch[2] };
+  }
+
+  // Try matching with timestamp suffix (13 digits)
+  const timestampMatch = sessionId.match(/^group-chat-(.+)-participant-(.+)-(\d{13,})$/);
+  if (timestampMatch) {
+    return { groupChatId: timestampMatch[1], participantName: timestampMatch[2] };
+  }
+
+  // Fallback: try the old pattern for backwards compatibility (non-hyphenated names)
+  const fallbackMatch = sessionId.match(/^group-chat-(.+)-participant-([^-]+)-/);
+  if (fallbackMatch) {
+    return { groupChatId: fallbackMatch[1], participantName: fallbackMatch[2] };
+  }
+
+  return null;
+}
+
 // Handle process output streaming (set up after initialization)
 function setupProcessListeners() {
   if (processManager) {
@@ -1872,9 +1911,9 @@ function setupProcessListeners() {
       }
 
       // Handle group chat participant output - buffer it
-      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid}
-      const participantMatch = sessionId.match(/^group-chat-(.+)-participant-([^-]+)-/);
-      if (participantMatch) {
+      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
+      const participantInfo = parseParticipantSessionId(sessionId);
+      if (participantInfo) {
         // Buffer the output - will be routed on process exit
         const existing = groupChatOutputBuffers.get(sessionId) || '';
         groupChatOutputBuffers.set(sessionId, existing + data);
@@ -1932,19 +1971,24 @@ function setupProcessListeners() {
       const moderatorMatch = sessionId.match(/^group-chat-(.+)-moderator-/);
       if (moderatorMatch) {
         const groupChatId = moderatorMatch[1];
+        logger.debug(`[GroupChat] Moderator exit: groupChatId=${groupChatId}`, 'ProcessListener', { sessionId });
         // Route the buffered output now that process is complete
         const bufferedOutput = groupChatOutputBuffers.get(sessionId);
         if (bufferedOutput) {
+          logger.debug(`[GroupChat] Moderator has buffered output (${bufferedOutput.length} chars)`, 'ProcessListener', { groupChatId });
           void (async () => {
             try {
               const chat = await loadGroupChat(groupChatId);
               const agentType = chat?.moderatorAgentId;
               const parsedText = extractTextFromStreamJson(bufferedOutput, agentType);
               if (parsedText.trim()) {
+                logger.info(`[GroupChat] Routing moderator response (${parsedText.length} chars)`, 'ProcessListener', { groupChatId });
                 const readOnly = getGroupChatReadOnlyState(groupChatId);
                 routeModeratorResponse(groupChatId, parsedText, processManager ?? undefined, agentDetector ?? undefined, readOnly).catch(err => {
                   logger.error('[GroupChat] Failed to route moderator response', 'ProcessListener', { error: String(err) });
                 });
+              } else {
+                logger.warn('[GroupChat] Moderator output parsed to empty string', 'ProcessListener', { groupChatId, bufferedLength: bufferedOutput.length });
               }
             } catch (err) {
               logger.error('[GroupChat] Failed to load chat for moderator output parsing', 'ProcessListener', { error: String(err) });
@@ -1959,6 +2003,8 @@ function setupProcessListeners() {
           })().finally(() => {
             groupChatOutputBuffers.delete(sessionId);
           });
+        } else {
+          logger.warn('[GroupChat] Moderator exit with no buffered output', 'ProcessListener', { groupChatId, sessionId });
         }
         groupChatEmitters.emitStateChange?.(groupChatId, 'idle');
         // Don't send to regular exit handler
@@ -1966,11 +2012,11 @@ function setupProcessListeners() {
       }
 
       // Handle group chat participant exit - route buffered output and update participant state
-      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid}
-      const participantMatch = sessionId.match(/^group-chat-(.+)-participant-([^-]+)-/);
-      if (participantMatch) {
-        const groupChatId = participantMatch[1];
-        const participantName = participantMatch[2];
+      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
+      const participantExitInfo = parseParticipantSessionId(sessionId);
+      if (participantExitInfo) {
+        const { groupChatId, participantName } = participantExitInfo;
+        logger.debug(`[GroupChat] Participant exit: ${participantName} (groupChatId=${groupChatId})`, 'ProcessListener', { sessionId });
         // Route the buffered output now that process is complete
         const bufferedOutput = groupChatOutputBuffers.get(sessionId);
         if (bufferedOutput) {
@@ -2031,11 +2077,10 @@ function setupProcessListeners() {
 
     processManager.on('session-id', (sessionId: string, agentSessionId: string) => {
       // Handle group chat participant session ID - store the agent's session ID
-      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid}
-      const participantMatch = sessionId.match(/^group-chat-(.+)-participant-([^-]+)-/);
-      if (participantMatch) {
-        const groupChatId = participantMatch[1];
-        const participantName = participantMatch[2];
+      // Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
+      const participantSessionInfo = parseParticipantSessionId(sessionId);
+      if (participantSessionInfo) {
+        const { groupChatId, participantName } = participantSessionInfo;
         // Update the participant with the agent's session ID
         updateParticipant(groupChatId, participantName, { agentSessionId }).then(async () => {
           // Emit participants changed so UI updates with the new session ID
@@ -2078,10 +2123,9 @@ function setupProcessListeners() {
       reasoningTokens?: number;  // Separate reasoning tokens (Codex o3/o4-mini)
     }) => {
       // Handle group chat participant usage - update participant stats
-      const participantMatch = sessionId.match(/^group-chat-(.+)-participant-([^-]+)-/);
-      if (participantMatch) {
-        const groupChatId = participantMatch[1];
-        const participantName = participantMatch[2];
+      const participantUsageInfo = parseParticipantSessionId(sessionId);
+      if (participantUsageInfo) {
+        const { groupChatId, participantName } = participantUsageInfo;
 
         // Calculate context usage percentage
         const totalTokens = usageStats.inputTokens + usageStats.outputTokens;
