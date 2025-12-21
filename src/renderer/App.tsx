@@ -92,7 +92,7 @@ import type {
 import { THEMES } from './constants/themes';
 import { generateId } from './utils/ids';
 import { getContextColor } from './utils/theme';
-import { setActiveTab, createTab, closeTab, reopenClosedTab, getActiveTab, getWriteModeTab, navigateToNextTab, navigateToPrevTab, navigateToTabByIndex, navigateToLastTab } from './utils/tabHelpers';
+import { setActiveTab, createTab, closeTab, reopenClosedTab, getActiveTab, getWriteModeTab, navigateToNextTab, navigateToPrevTab, navigateToTabByIndex, navigateToLastTab, getInitialRenameValue } from './utils/tabHelpers';
 import { TAB_SHORTCUTS } from './constants/shortcuts';
 import { shouldOpenExternally, getAllFolderPaths, flattenTree } from './utils/fileExplorer';
 import { substituteTemplateVariables } from './utils/templateVariables';
@@ -1371,13 +1371,12 @@ export default function MaestroConsole() {
             return s;
           }
 
-          // Update the target tab's agentSessionId, name (if not already set), and clear awaitingSessionId flag
-          // Generate short UUID for display (first 8 chars, uppercase)
-          const shortUuid = agentSessionId.substring(0, 8).toUpperCase();
+          // Update the target tab's agentSessionId and clear awaitingSessionId flag
+          // Keep name as null for auto-generated display (derived from agentSessionId)
           const updatedAiTabs = s.aiTabs.map(tab => {
             if (tab.id !== targetTab.id) return tab;
-            // Only set name if it's still the default "New Session"
-            const newName = (!tab.name || tab.name === 'New Session') ? shortUuid : tab.name;
+            // Only preserve existing custom name, don't auto-set to UUID
+            const newName = (tab.name && tab.name !== 'New Session') ? tab.name : null;
             return { ...tab, agentSessionId, awaitingSessionId: false, name: newName };
           });
 
@@ -5697,7 +5696,7 @@ export default function MaestroConsole() {
               // Only allow rename if tab has an active Claude session
               if (activeTab?.agentSessionId) {
                 setRenameTabId(activeTab.id);
-                setRenameTabInitialName(activeTab.name || '');
+                setRenameTabInitialName(getInitialRenameValue(activeTab));
                 setRenameTabModalOpen(true);
               }
             }
@@ -6615,7 +6614,7 @@ export default function MaestroConsole() {
           const tab = activeSession.aiTabs?.find(t => t.id === tabId);
           if (tab) {
             setRenameTabId(tabId);
-            setRenameTabInitialName(tab.name || '');
+            setRenameTabInitialName(getInitialRenameValue(tab));
             setRenameTabModalOpen(true);
           }
         }}

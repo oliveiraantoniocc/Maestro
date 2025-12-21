@@ -4,6 +4,18 @@
 import { Session, AITab, ClosedTab, LogEntry, UsageStats } from '../types';
 import { generateId } from './ids';
 
+/**
+ * Get the initial name to show in the rename modal.
+ * Returns empty string if no custom name is set (name is null),
+ * or the custom name if user has set one.
+ *
+ * @param tab - The AI tab being renamed
+ * @returns The name to pre-fill in the rename input (empty for auto-generated names)
+ */
+export function getInitialRenameValue(tab: AITab): string {
+  return tab.name || '';
+}
+
 // Maximum number of closed tabs to keep in history
 const MAX_CLOSED_TAB_HISTORY = 25;
 

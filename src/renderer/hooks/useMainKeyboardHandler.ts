@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Session, AITab } from '../types';
 import { TAB_SHORTCUTS } from '../constants/shortcuts';
+import { getInitialRenameValue } from '../utils/tabHelpers';
 
 /**
  * Context object passed to the main keyboard handler via ref.
@@ -379,7 +380,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
           // Only allow rename if tab has an active Claude session
           if (activeTab?.agentSessionId) {
             ctx.setRenameTabId(activeTab.id);
-            ctx.setRenameTabInitialName(activeTab.name || '');
+            ctx.setRenameTabInitialName(getInitialRenameValue(activeTab));
             ctx.setRenameTabModalOpen(true);
           }
         }
