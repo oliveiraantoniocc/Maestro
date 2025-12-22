@@ -2242,6 +2242,11 @@ function setupProcessListeners() {
       mainWindow?.webContents.send('process:thinking-chunk', sessionId, content);
     });
 
+    // Handle tool execution events (OpenCode, Codex)
+    processManager.on('tool-execution', (sessionId: string, toolEvent: { toolName: string; state?: unknown; timestamp: number }) => {
+      mainWindow?.webContents.send('process:tool-execution', sessionId, toolEvent);
+    });
+
     // Handle stderr separately from runCommand (for clean command execution)
     processManager.on('stderr', (sessionId: string, data: string) => {
       mainWindow?.webContents.send('process:stderr', sessionId, data);
