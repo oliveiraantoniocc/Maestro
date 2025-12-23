@@ -399,7 +399,32 @@ const LogItemComponent = memo(({
             )}
           </div>
         )}
-        {log.source !== 'error' && (hasNoMatches ? (
+        {/* Special rendering for thinking/streaming content (AI reasoning in real-time) */}
+        {log.source === 'thinking' && (
+          <div
+            className="px-4 py-2 text-sm font-mono border-l-2"
+            style={{
+              color: theme.colors.textDim,
+              borderColor: theme.colors.accentText,
+              backgroundColor: `${theme.colors.accentText}05`,
+              opacity: 0.85,
+            }}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded"
+                style={{
+                  backgroundColor: `${theme.colors.accentText}20`,
+                  color: theme.colors.accentText
+                }}
+              >
+                thinking
+              </span>
+            </div>
+            <div className="whitespace-pre-wrap">{log.text}</div>
+          </div>
+        )}
+        {log.source !== 'error' && log.source !== 'thinking' && (hasNoMatches ? (
           <div className="flex items-center justify-center py-8 text-sm" style={{ color: theme.colors.textDim }}>
             <span>No matches found for filter</span>
           </div>

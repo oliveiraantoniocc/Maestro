@@ -1821,6 +1821,57 @@ export default function MaestroConsole() {
       setAgentErrorModalSessionId(actualSessionId);
     });
 
+    // Handle thinking/streaming content chunks from AI agents
+    // Only appends to logs if the tab has showThinking enabled
+    const unsubscribeThinkingChunk = window.maestro.process.onThinkingChunk?.((sessionId: string, content: string) => {
+      // Parse sessionId to get actual session ID and tab ID (format: {id}-ai-{tabId})
+      const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+      if (!aiTabMatch) return; // Only handle AI tab messages
+
+      const actualSessionId = aiTabMatch[1];
+      const tabId = aiTabMatch[2];
+
+      setSessions(prev => prev.map(s => {
+        if (s.id !== actualSessionId) return s;
+
+        const targetTab = s.aiTabs.find(t => t.id === tabId);
+        if (!targetTab) return s;
+
+        // Only append if thinking is enabled for this tab
+        if (!targetTab.showThinking) return s;
+
+        // Find the last log entry - if it's a thinking entry, append to it
+        const lastLog = targetTab.logs[targetTab.logs.length - 1];
+        if (lastLog?.source === 'thinking') {
+          // Append to existing thinking block
+          return {
+            ...s,
+            aiTabs: s.aiTabs.map(tab =>
+              tab.id === tabId
+                ? { ...tab, logs: [...tab.logs.slice(0, -1), { ...lastLog, text: lastLog.text + content }] }
+                : tab
+            )
+          };
+        } else {
+          // Create new thinking block
+          const newLog: LogEntry = {
+            id: generateId(),
+            timestamp: Date.now(),
+            source: 'thinking',
+            text: content
+          };
+          return {
+            ...s,
+            aiTabs: s.aiTabs.map(tab =>
+              tab.id === tabId
+                ? { ...tab, logs: [...tab.logs, newLog] }
+                : tab
+            )
+          };
+        }
+      }));
+    });
+
     // Cleanup listeners on unmount
     return () => {
       unsubscribeData();
@@ -1831,6 +1882,7 @@ export default function MaestroConsole() {
       unsubscribeCommandExit();
       unsubscribeUsage();
       unsubscribeAgentError();
+      unsubscribeThinkingChunk?.();
     };
   }, []);
 
